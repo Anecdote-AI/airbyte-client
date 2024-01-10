@@ -114,7 +114,7 @@ class Client:
             'Authorization': 'Bearer {}'.format(token)
         }
 
-    def base_request(self, path: str, json: Optional[Union[dict, str, list]] = None,
+    def base_request(self, path: str, json: Optional[Union[str, List[str], Mapping[str, Any]]] = None,
                      method: str = 'POST') -> requests.Response:
         try:
             response = requests.request(method, self.base_url + path, headers=self.headers, json=json,
@@ -227,8 +227,8 @@ class Base:
 
 class Workspaces(Base):
     def create(self, name: str,
-               email: Union[str, None] = None,
-               webhook_url: Union[str, None] = None
+               email: Optional[str] = None,
+               webhook_url: Optional[str] = None
                ) -> requests.Response:
         return self.airbyte_client.base_request('create', {
             'email': email,
@@ -303,8 +303,8 @@ class Workspaces(Base):
         })
 
     def update(self, workspace_id: str,
-               email: Union[str, None] = None,
-               webhook_url: Union[str, None] = None
+               email: Optional[str] = None,
+               webhook_url: Optional[str] = None
                ) -> requests.Response:
         return self.airbyte_client.base_request('update', {
             'workspaceId': workspace_id,
@@ -369,8 +369,8 @@ class Workspaces(Base):
 
 class SourceDefinitions(Base):
     def create(self, name: str, docker_repository: str, docker_image_tag: str, documentation_url: str,
-               icon: Union[str, None] = None,
-               resource_requirements: Union[Mapping[str, Any], None] = None) -> requests.Response:
+               icon: Optional[str] = None,
+               resource_requirements: Optional[Mapping[str, Any]] = None) -> requests.Response:
         data = {
             'name': name,
             'dockerRepository': docker_repository,
@@ -384,7 +384,7 @@ class SourceDefinitions(Base):
         return self.airbyte_client.base_request('create', data)
 
     def update(self, source_definition_id: str, docker_image_tag: str,
-               resource_requirements: Union[Mapping[str, Any], None] = None) -> requests.Response:
+               resource_requirements: Optional[Mapping[str, Any]] = None) -> requests.Response:
         data = {
             'sourceDefinitionId': source_definition_id,
             'dockerImageTag': docker_image_tag
@@ -419,8 +419,8 @@ class SourceDefinitions(Base):
 
     def create_custom(self, workspace_id: str,
                       name: str, docker_repository: str, docker_image_tag: str, documentation_url: str,
-                      icon: Union[str, None] = None,
-                      resource_requirements: Union[Mapping[str, Any], None] = None) -> requests.Response:
+                      icon: Optional[str] = None,
+                      resource_requirements: Optional[Mapping[str, Any]] = None) -> requests.Response:
         data = {
             'workspaceId': workspace_id,
             'sourceDefinition': {
@@ -443,7 +443,7 @@ class SourceDefinitions(Base):
         })
 
     def update_custom(self, workspace_id: str, source_definition_id: str, docker_image_tag: str,
-                      resource_requirements: Union[Mapping[str, Any], None] = None) -> requests.Response:
+                      resource_requirements: Optional[Mapping[str, Any]] = None) -> requests.Response:
         data = {
             'workspaceId': workspace_id,
             'sourceDefinition': {
@@ -510,10 +510,10 @@ class Sources(Base):
             'sourceId': source_id
         })
 
-    def search(self, workspace_id: Union[str, None] = None, source_definition_id: Union[str, None] = None,
-               name: Union[str, None] = None,
-               source_id: Union[str, None] = None, source_name: Union[str, None] = None,
-               connection_configuration: Union[Mapping[str, Any], None] = None) -> requests.Response:
+    def search(self, workspace_id: Optional[str] = None, source_definition_id: Optional[str] = None,
+               name: Optional[str] = None,
+               source_id: Optional[str] = None, source_name: Optional[str] = None,
+               connection_configuration: Optional[Mapping[str, Any]] = None) -> requests.Response:
         data = {}
         if workspace_id is not None:
             data['workspaceId'] = workspace_id
@@ -556,8 +556,8 @@ class Sources(Base):
             'connectionConfiguration': connection_configuration
         })
 
-    def discover_schema(self, source_id: str, connection_id: Union[str, None] = None,
-                        disable_cache: Union[bool, None] = None) -> requests.Response:
+    def discover_schema(self, source_id: str, connection_id: Optional[str] = None,
+                        disable_cache: Optional[bool] = None) -> requests.Response:
         data = {
             'sourceId': source_id,
         }
@@ -570,8 +570,8 @@ class Sources(Base):
 
 class DestinationDefinitions(Base):
     def create(self, name: str, docker_repository: str, docker_image_tag: str, documentation_url: str,
-               icon: Union[str, None] = None,
-               resource_requirements: Union[Mapping[str, Any], None] = None) -> requests.Response:
+               icon: Optional[str] = None,
+               resource_requirements: Optional[Mapping[str, Any]] = None) -> requests.Response:
         data = {
             'name': name,
             'dockerRepository': docker_repository,
@@ -585,7 +585,7 @@ class DestinationDefinitions(Base):
         return self.airbyte_client.base_request('create', data)
 
     def update(self, destination_definition_id: str, docker_image_tag: str,
-               resource_requirements: Union[Mapping[str, Any], None] = None) -> requests.Response:
+               resource_requirements: Optional[Mapping[str, Any]] = None) -> requests.Response:
         data = {
             'destinationDefinitionId': destination_definition_id,
             'dockerImageTag': docker_image_tag
@@ -620,8 +620,8 @@ class DestinationDefinitions(Base):
 
     def create_custom(self, workspace_id: str,
                       name: str, docker_repository: str, docker_image_tag: str, documentation_url: str,
-                      icon: Union[str, None] = None,
-                      resource_requirements: Union[Mapping[str, Any], None] = None) -> requests.Response:
+                      icon: Optional[str] = None,
+                      resource_requirements: Optional[Mapping[str, Any]] = None) -> requests.Response:
         data = {
             'workspaceId': workspace_id,
             'destinationDefinition': {
@@ -644,7 +644,7 @@ class DestinationDefinitions(Base):
         })
 
     def update_custom(self, workspace_id: str, destination_definition_id: str, docker_image_tag: str,
-                      resource_requirements: Union[Mapping[str, Any], None] = None) -> requests.Response:
+                      resource_requirements: Optional[Mapping[str, Any]] = None) -> requests.Response:
         data = {
             'workspaceId': workspace_id,
             'destinationDefinition': {
@@ -711,10 +711,10 @@ class Destinations(Base):
             'destinationId': destination_id
         })
 
-    def search(self, workspace_id: Union[str, None] = None, destination_definition_id: Union[str, None] = None,
-               name: Union[str, None] = None,
-               destination_id: Union[str, None] = None, destination_name: Union[str, None] = None,
-               connection_configuration: Union[Mapping[str, Any], None] = None) -> requests.Response:
+    def search(self, workspace_id: Optional[str] = None, destination_definition_id: Optional[str] = None,
+               name: Optional[str] = None,
+               destination_id: Optional[str] = None, destination_name: Optional[str] = None,
+               connection_configuration: Optional[Mapping[str, Any]] = None) -> requests.Response:
         data = {}
         if workspace_id is not None:
             data['workspaceId'] = workspace_id
@@ -762,10 +762,10 @@ class Destinations(Base):
 class Connections(Base):
     def create(self, name: str, namespace_definition: str, namespace_format: str, prefix: str,
                source_id: str, destination_id: str, streams: List[Mapping[str, Any]], status: str,
-               operation_ids: Union[List[str], None] = None, schedule: Union[Mapping[str, Any], None] = None,
-               schedule_type: Union[str, None] = None, schedule_data: Union[Mapping[str, Any], None] = None,
-               resource_requirements: Union[Mapping[str, Any], None] = None,
-               source_catalog_id: Union[str, None] = None) -> requests.Response:
+               operation_ids: Optional[List[str]] = None, schedule: Optional[Mapping[str, Any]] = None,
+               schedule_type: Optional[str] = None, schedule_data: Optional[Mapping[str, Any]] = None,
+               resource_requirements: Optional[Mapping[str, Any]] = None,
+               source_catalog_id: Optional[str] = None) -> requests.Response:
         data = {
             'name': name,
             'namespaceDefinition': namespace_definition,
@@ -851,15 +851,15 @@ class Connections(Base):
             'connectionId': connection_id
         })
 
-    def search(self, connection_id: Union[str, None] = None, name: Union[str, None] = None,
-               namespace_definition: Union[str, None] = None, namespace_format: Union[str, None] = None,
-               prefix: Union[str, None] = None,
-               source_id: Union[str, None] = None, destination_id: Union[str, None] = None,
-               schedule: Union[Mapping[str, Any], None] = None,
-               schedule_type: Union[str, None] = None, schedule_data: Union[Mapping[str, Any], None] = None,
-               status: Union[str, None] = None,
-               source: Union[Mapping[str, Any], None] = None,
-               destination: Union[Mapping[str, Any], None] = None) -> requests.Response:
+    def search(self, connection_id: Optional[str] = None, name: Optional[str] = None,
+               namespace_definition: Optional[str] = None, namespace_format: Optional[str] = None,
+               prefix: Optional[str] = None,
+               source_id: Optional[str] = None, destination_id: Optional[str] = None,
+               schedule: Optional[Mapping[str, Any]] = None,
+               schedule_type: Optional[str] = None, schedule_data: Optional[Mapping[str, Any]] = None,
+               status: Optional[str] = None,
+               source: Optional[Mapping[str, Any]] = None,
+               destination: Optional[Mapping[str, Any]] = None) -> requests.Response:
         data = {}
         if connection_id is not None:
             data['connectionId'] = connection_id

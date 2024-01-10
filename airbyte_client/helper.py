@@ -8,7 +8,7 @@ from airbyte_client.client import Base, Client
 
 
 class Helper(Base):
-    def workspace_create_safe(self, name: str, email: Optional[str] = None) -> \
+    def workspace_create_safe(self, name: str, email: Optional[str] = None, webhook_url: Optional[str] = None) -> \
             Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
         response = self.airbyte_client.workspaces().list()
         if not response.ok:
@@ -19,7 +19,7 @@ class Helper(Base):
                 return response, {'error_code': 409, 'error_str': f'Project name {name} already exists'}
 
         time.sleep(self.timeout_between_requests_ms / 1000.0)
-        response = self.airbyte_client.workspaces().create(name, email)
+        response = self.airbyte_client.workspaces().create(name, email, webhook_url)
         if not response.ok:
             return response, {'error_code': 500, 'error_str': 'Internal error: unable to create Airbyte workspace'}
 
