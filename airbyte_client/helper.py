@@ -334,6 +334,7 @@ class Helper(Base):
                     continue
                 if stream_configuration.get('selectedFields'):
                     s['config']['selectedFields'] = stream_configuration['selectedFields']
+                    s['config']['fieldSelectionEnabled'] = True
                 s['config']['syncMode'] = stream_configuration['syncMode']
                 s['config']['destinationSyncMode'] = stream_configuration['destinationSyncMode']
                 s['config']['selected'] = True
