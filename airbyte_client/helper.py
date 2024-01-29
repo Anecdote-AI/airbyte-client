@@ -763,7 +763,7 @@ class Discord(AnecdoteConnection):
 
         source_configuration = {
             'channels': channels,
-            'apify_token': token,
+            'token': token,
             'start_date': start_date,
         }
 
