@@ -755,7 +755,7 @@ class Discord(AnecdoteConnection):
         )
 
     def enable(
-            self, workspace_id: str, customer_name: str, ind: int, channels: List[str], token: str,
+            self, workspace_id: str, customer_name: str, ind: int, channels: List[str], apify_token: str,
             start_date: Optional[str] = None
     ) -> Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
         if start_date is None:
@@ -763,7 +763,7 @@ class Discord(AnecdoteConnection):
 
         source_configuration = {
             'channels': channels,
-            'apify_token': token,
+            'apify_token': apify_token,
             'start_date': start_date,
         }
 
