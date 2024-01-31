@@ -775,6 +775,11 @@ class Discord(AnecdoteConnection):
         }
         return self.connect(workspace_id, customer_name, ind, source_configuration, streams_configuration)
 
+
+    def disable(self, workspace_id: str, customer_name: str, ind: int) -> \
+            Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
+        return self.disconnect(workspace_id, ind)
+
 class Freshdesk(AnecdoteConnection):
     def __init__(
             self, airbyte_client: Client, source_definition_id: str, destination_definition_id: str,
