@@ -1186,6 +1186,54 @@ class Intercom(AnecdoteConnection):
         return self.disconnect(workspace_id, ind)
 
 
+class IntercomThread(AnecdoteConnection):
+    def __init__(
+            self, airbyte_client: Client, source_definition_id: str, destination_definition_id: str,
+            s3_bucket_name: str, s3_bucket_region: str, s3_format: Mapping[str, Any],
+            schedule: Optional[Mapping[str, Any]] = None,
+            s3_access_key_id: Optional[str] = None, s3_secret_access_key: Optional[str] = None,
+            s3_endpoint: Optional[str] = None, s3_path_format: Optional[str] = None,
+            s3_file_name_pattern: Optional[str] = None
+    ):
+        super().__init__(
+            airbyte_client, 'Intercom Thread', source_definition_id, destination_definition_id,
+            s3_bucket_name, s3_bucket_region, s3_format,
+            schedule,
+            s3_access_key_id, s3_secret_access_key,
+            s3_endpoint, s3_path_format,
+            s3_file_name_pattern
+        )
+
+    def enable(
+            self, workspace_id: str, customer_name: str, ind: int, access_token: str,
+            start_date: Optional[str] = None
+    ) -> Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
+        if start_date is None:
+            start_date = '2022-01-01'
+
+        source_configuration = {
+            'access_token': access_token,
+            'start_date': start_date + 'T00:00:00Z',
+        }
+
+        streams_configuration = {
+            'conversation_parts': {
+                'syncMode': 'incremental',
+                'destinationSyncMode': 'append',
+            },
+            'conversations': {
+                'syncMode': 'incremental',
+                'destinationSyncMode': 'append',
+            }
+        }
+
+        return self.connect(workspace_id, customer_name, ind, source_configuration, streams_configuration)
+
+    def disable(self, workspace_id: str, customer_name: str, ind: int) -> \
+            Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
+        return self.disconnect(workspace_id, ind)
+
+
 class Kustomer(AnecdoteConnection):
     def __init__(
             self, airbyte_client: Client, source_definition_id: str, destination_definition_id: str,
