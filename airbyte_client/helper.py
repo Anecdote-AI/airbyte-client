@@ -1418,7 +1418,7 @@ class SteamReviews(AnecdoteConnection):
             s3_file_name_pattern: Optional[str] = None
     ):
         super().__init__(
-            airbyte_client, 'SteamReviews', source_definition_id, destination_definition_id,
+            airbyte_client, 'Steam Reviews', source_definition_id, destination_definition_id,
             s3_bucket_name, s3_bucket_region, s3_format,
             schedule,
             s3_access_key_id, s3_secret_access_key,
