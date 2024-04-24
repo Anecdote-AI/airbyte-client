@@ -228,7 +228,8 @@ class Base:
 class Workspaces(Base):
     def create(self, name: str,
                email: Optional[str] = None,
-               webhook_url: Optional[str] = None
+               webhook_url: Optional[str] = None,
+               organization_id: str = '00000000-0000-0000-0000-000000000000'
                ) -> requests.Response:
         return self.airbyte_client.base_request('create', {
             'email': email,
@@ -275,6 +276,7 @@ class Workspaces(Base):
                     ]
                 }
             },
+            'organizationId': organization_id,
             'displaySetupWizard': True,
             'defaultGeography': 'auto',
         })
