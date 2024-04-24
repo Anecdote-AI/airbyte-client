@@ -1051,7 +1051,7 @@ class GooglePlayScraper(AnecdoteConnection):
 
     def enable(
             self, workspace_id: str, customer_name: str, ind: int, app_id: str,
-            languages: Optional[Mapping[str, Any]] = None, start_date: Optional[str] = None,
+            languages: Optional[Mapping[str, Any]] = None, start_date: Optional[str] = None, country: str = 'US',
             timeout_milliseconds: Optional[int] = None, max_reviews_per_request: Optional[int] = None,
             proxy_config: Optional[Mapping[str, Any]] = None
     ) -> Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
@@ -1063,7 +1063,8 @@ class GooglePlayScraper(AnecdoteConnection):
         source_configuration = {
             'app_id': app_id,
             'languages': languages,
-            'start_date': start_date
+            'start_date': start_date,
+            'country': country
         }
         if timeout_milliseconds is not None:
             source_configuration['timeout_milliseconds'] = timeout_milliseconds
