@@ -569,7 +569,7 @@ class AnecdoteSurveys(AnecdoteConnection):
             s3_file_name_pattern: Optional[str] = None
     ):
         super().__init__(
-            airbyte_client, 'AnecdoteSurveys', source_definition_id, destination_definition_id,
+            airbyte_client, 'Anecdote Surveys', source_definition_id, destination_definition_id,
             s3_bucket_name, s3_bucket_region, s3_format,
             schedule,
             s3_access_key_id, s3_secret_access_key,
@@ -578,8 +578,8 @@ class AnecdoteSurveys(AnecdoteConnection):
         )
 
     def enable(
-            self, workspace_id: str, customer_name: str, ind: int, project_id: int, admin_psk: str, base_url: str,
-            start_date: Optional[str] = None
+            self, workspace_id: str, customer_name: str, ind: int, project_id: int, admin_psk: str,
+            base_url: str = 'https://api.anecdoteai.com', start_date: Optional[str] = None
     ) -> Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
         if start_date is None:
             start_date = (datetime.today() - timedelta(days=6)).strftime('%Y-%m-%d')
@@ -597,8 +597,8 @@ class AnecdoteSurveys(AnecdoteConnection):
                 'destinationSyncMode': 'append',
             },
             'surveys': {
-                'syncMode': 'full_refresh',
-                'destinationSyncMode': 'overwrite',
+                'syncMode': 'incremental',
+                'destinationSyncMode': 'append',
             }
         }
 
@@ -607,6 +607,7 @@ class AnecdoteSurveys(AnecdoteConnection):
     def disable(self, workspace_id: str, customer_name: str, ind: int) -> \
             Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
         return self.disconnect(workspace_id, ind)
+
 
 class ApifyTwitterMentions(AnecdoteConnection):
     def __init__(
@@ -651,6 +652,7 @@ class ApifyTwitterMentions(AnecdoteConnection):
     def disable(self, workspace_id: str, customer_name: str, ind: int) -> \
             Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
         return self.disconnect(workspace_id, ind)
+
 
 class AppStoreAMP(AnecdoteConnection):
     def __init__(
@@ -829,6 +831,7 @@ class Delighted(AnecdoteConnection):
             Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
         return self.disconnect(workspace_id, ind)
 
+
 class Discord(AnecdoteConnection):
     def __init__(
             self, airbyte_client: Client, source_definition_id: str, destination_definition_id: str,
@@ -868,10 +871,10 @@ class Discord(AnecdoteConnection):
         }
         return self.connect(workspace_id, customer_name, ind, source_configuration, streams_configuration)
 
-
     def disable(self, workspace_id: str, customer_name: str, ind: int) -> \
             Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
         return self.disconnect(workspace_id, ind)
+
 
 class Freshdesk(AnecdoteConnection):
     def __init__(
