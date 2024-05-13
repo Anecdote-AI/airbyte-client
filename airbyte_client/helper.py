@@ -1437,6 +1437,8 @@ class RedditApi(AnecdoteConnection):
     ) -> Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
         if start_date is None:
             start_date = '2022-01-01'
+        if 'T' not in start_date:
+            start_date += 'T00:00:00Z'
 
         source_configuration = {
             'subreddits': subreddits,
