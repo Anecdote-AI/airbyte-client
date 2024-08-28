@@ -1741,7 +1741,7 @@ class TwitterMentions(AnecdoteConnection):
         )
 
     def enable(
-            self, workspace_id: str, customer_name: str, ind: int, bearer_token: str, mentions: List[str],
+            self, workspace_id: str, customer_name: str, ind: int, bearer_token: str, search_query: str,
             start_date: Optional[str] = None,
             timeout_milliseconds: Optional[int] = None
     ) -> Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
@@ -1750,7 +1750,7 @@ class TwitterMentions(AnecdoteConnection):
 
         source_configuration = {
             'bearer_token': bearer_token,
-            'mentions': mentions,
+            'search_query': search_query,
             'start_date': start_date,
         }
         if timeout_milliseconds is not None:
