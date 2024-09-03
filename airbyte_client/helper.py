@@ -636,7 +636,7 @@ class ApifyFacebookPosts(AnecdoteConnection):
 
         source_configuration = {
             'apify_token': apify_token,
-            'startUrls': start_urls,
+            'start_urls': start_urls,
             'start_date': start_date,
         }
 
@@ -681,7 +681,7 @@ class ApifyInstagramPosts(AnecdoteConnection):
 
         source_configuration = {
             'apify_token': apify_token,
-            'directUrls': start_urls,
+            'start_urls': start_urls,
             'start_date': start_date,
         }
 
