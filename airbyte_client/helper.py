@@ -1783,7 +1783,7 @@ class Tiktok(AnecdoteConnection):
 
     def enable(
             self, workspace_id: str, customer_name: str, ind: int,
-            apify_token: str, start_urls: List[str],
+            apify_token: str, profiles: List[str],
             start_date: Optional[str] = None
     ) -> Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
         if start_date is None:
@@ -1791,7 +1791,7 @@ class Tiktok(AnecdoteConnection):
 
         source_configuration = {
             'apify_token': apify_token,
-            'profiles': start_urls,
+            'profiles': profiles,
             'start_date': start_date,
         }
 
