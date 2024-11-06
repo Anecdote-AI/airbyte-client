@@ -1890,7 +1890,7 @@ class TwitterMentions(AnecdoteConnection):
         if timeout_milliseconds is not None:
             source_configuration['timeout_milliseconds'] = timeout_milliseconds
         else:
-            source_configuration['timeout_milliseconds'] = 1000
+            source_configuration['timeout_milliseconds'] = 3000
 
         streams_configuration = {
             'tweets': {
