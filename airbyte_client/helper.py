@@ -1407,7 +1407,7 @@ class IntercomConversations(AnecdoteConnection):
         }
 
         streams_configuration = {
-            'conversation_parts': {
+            'contacts': {
                 'syncMode': 'incremental',
                 'destinationSyncMode': 'append',
             },
