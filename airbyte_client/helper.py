@@ -901,11 +901,11 @@ class Delighted(AnecdoteConnection):
             start_date: Optional[str] = None
     ) -> Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
         if start_date is None:
-            start_date = '2022-01-01T01:00:00Z'
+            start_date = '2024-06-01T00:00:00Z'
 
         source_configuration = {
             'api_key': delighted_api_key,
-            'since': start_date + 'T01:00:00Z',
+            'since': start_date,
         }
 
         streams_configuration = {
