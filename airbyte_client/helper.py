@@ -1399,7 +1399,7 @@ class IntercomConversations(AnecdoteConnection):
             start_date: Optional[str] = None
     ) -> Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
         if start_date is None:
-            start_date = '2024-11-01'
+            start_date = '2024-12-01'
 
         source_configuration = {
             'access_token': access_token,
@@ -1414,6 +1414,10 @@ class IntercomConversations(AnecdoteConnection):
             'conversations': {
                 'syncMode': 'incremental',
                 'destinationSyncMode': 'append',
+            },
+            'tags': {
+                'syncMode': 'full_refresh',
+                'destinationSyncMode': 'overwrite',
             }
         }
 
