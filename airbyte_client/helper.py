@@ -1396,7 +1396,8 @@ class IntercomConversations(AnecdoteConnection):
 
     def enable(
             self, workspace_id: str, customer_name: str, ind: int, access_token: str,
-            start_date: Optional[str] = None
+            start_date: Optional[str] = None, excluded_names: Optional[List[str]] = None, 
+            excluded_emails: Optional[List[str]] = None
     ) -> Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
         if start_date is None:
             start_date = '2024-12-01'
@@ -1405,6 +1406,10 @@ class IntercomConversations(AnecdoteConnection):
             'access_token': access_token,
             'start_date': start_date,
         }
+        if excluded_names is not None:
+            source_configuration['excluded_names'] = excluded_names
+        if excluded_emails is not None:
+            source_configuration['excluded_emails'] = excluded_emails
 
         streams_configuration = {
             'contacts': {
