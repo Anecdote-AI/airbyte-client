@@ -1414,9 +1414,9 @@ class IntercomConversations(AnecdoteConnection):
             excluded_emails: Optional[List[str]] = None
     ) -> Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
         if start_date is None:
-            start_date = '2024-12-01'
+            start_date = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
 
-        metadata_start_date = '2025-01-01'
+        metadata_start_date = '2000-01-01'
 
         # First create the metadata connection
         metadata_response, metadata_error = self.metadata_connection.enable(
@@ -1487,8 +1487,9 @@ class IntercomConversationsMetadata(AnecdoteConnection):
                 name, customer_name, ind
             )
 
+        connection_name = self.name + ' | ' + str(ind)
         response, error_map = self.connection_create_safe_full(
-            workspace_id, self.name + ' | ' + str(ind),
+            workspace_id, connection_name,
             'destination', '${SOURCE_NAMESPACE}', '',
             self.source_definition_id, source_configuration,
             self.destination_definition_id, self.destination_configuration,
