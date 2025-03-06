@@ -1393,6 +1393,111 @@ class IntercomConversations(AnecdoteConnection):
             s3_endpoint, s3_path_format,
             s3_file_name_pattern
         )
+        # Create metadata connection handler with modified parameters
+        metadata_bucket_name = "anecdote-dwh-metadata-bucket"
+        # No change in path format and schedule
+        metadata_path_format = s3_path_format
+        metadata_schedule = schedule
+        
+        self.metadata_connection = IntercomConversationsMetadata(
+            airbyte_client, source_definition_id, destination_definition_id,
+            metadata_bucket_name, s3_bucket_region, s3_format,
+            metadata_schedule,
+            s3_access_key_id, s3_secret_access_key,
+            s3_endpoint, metadata_path_format,
+            s3_file_name_pattern
+        )
+
+    def enable(
+            self, workspace_id: str, customer_name: str, ind: int, access_token: str,
+            start_date: Optional[str] = None, excluded_names: Optional[List[str]] = None, 
+            excluded_emails: Optional[List[str]] = None
+    ) -> Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
+        if start_date is None:
+            start_date = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
+
+        metadata_start_date = '2000-01-01'
+
+        # First create the metadata connection
+        metadata_response, metadata_error = self.metadata_connection.enable(
+            workspace_id, customer_name, ind, access_token,
+            metadata_start_date, excluded_names, excluded_emails
+        )
+        
+        if metadata_error is not None:
+            return metadata_response, metadata_error
+
+        # Then create the main conversations connection
+        source_configuration = {
+            'access_token': access_token,
+            'start_date': start_date,
+        }
+        if excluded_names is not None:
+            source_configuration['excluded_names'] = excluded_names
+        if excluded_emails is not None:
+            source_configuration['excluded_emails'] = excluded_emails
+
+        streams_configuration = {
+            'conversations': {
+                'syncMode': 'incremental',
+                'destinationSyncMode': 'append',
+            }
+        }
+
+        return self.connect(workspace_id, customer_name, ind, source_configuration, streams_configuration)
+
+    def disable(self, workspace_id: str, customer_name: str, ind: int) -> \
+            Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
+        # First disable the metadata connection
+        metadata_response, metadata_error = self.metadata_connection.disable(workspace_id, customer_name, ind)
+        if metadata_error is not None:
+            return metadata_response, metadata_error
+            
+        # Then disable the main connection
+        return self.disconnect(workspace_id, ind)
+    
+class IntercomConversationsMetadata(AnecdoteConnection):
+    def __init__(
+            self, airbyte_client: Client, source_definition_id: str, destination_definition_id: str,
+            s3_bucket_name: str, s3_bucket_region: str, s3_format: Mapping[str, Any],
+            schedule: Optional[Mapping[str, Any]] = None,
+            s3_access_key_id: Optional[str] = None, s3_secret_access_key: Optional[str] = None,
+            s3_endpoint: Optional[str] = None, s3_path_format: Optional[str] = None,
+            s3_file_name_pattern: Optional[str] = None
+    ):
+        super().__init__(
+            airbyte_client, 'Intercom Conversations Metadata', source_definition_id, destination_definition_id,
+            s3_bucket_name, s3_bucket_region, s3_format,
+            schedule,
+            s3_access_key_id, s3_secret_access_key,
+            s3_endpoint, s3_path_format,
+            s3_file_name_pattern
+        )
+
+    def connect(
+            self, workspace_id: str, customer_name: str, ind: int,
+            source_configuration: Mapping[str, Any],
+            streams_configuration: Mapping[str, Any]
+    ) -> Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
+        name = 'intercom-conversations'
+        customer_name = self.__transform_name(customer_name)
+
+        self.destination_configuration['s3_bucket_path'] = \
+            'source-name={}/customer-name={}/source-index={}'.format(
+                name, customer_name, ind
+            )
+
+        connection_name = self.name + ' | ' + str(ind)
+        response, error_map = self.connection_create_safe_full(
+            workspace_id, connection_name,
+            'destination', '${SOURCE_NAMESPACE}', '',
+            self.source_definition_id, source_configuration,
+            self.destination_definition_id, self.destination_configuration,
+            streams_configuration,
+            'active',
+            schedule=self.schedule
+        )
+        return response, error_map
 
     def enable(
             self, workspace_id: str, customer_name: str, ind: int, access_token: str,
@@ -1416,10 +1521,6 @@ class IntercomConversations(AnecdoteConnection):
                 'syncMode': 'incremental',
                 'destinationSyncMode': 'append',
             },
-            'conversations': {
-                'syncMode': 'incremental',
-                'destinationSyncMode': 'append',
-            },
             'tags': {
                 'syncMode': 'full_refresh',
                 'destinationSyncMode': 'overwrite',
@@ -1431,7 +1532,6 @@ class IntercomConversations(AnecdoteConnection):
     def disable(self, workspace_id: str, customer_name: str, ind: int) -> \
             Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
         return self.disconnect(workspace_id, ind)
-
 
 class Kustomer(AnecdoteConnection):
     def __init__(
