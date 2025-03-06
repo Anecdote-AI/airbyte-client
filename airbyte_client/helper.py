@@ -1474,6 +1474,30 @@ class IntercomConversationsMetadata(AnecdoteConnection):
             s3_file_name_pattern
         )
 
+    def connect(
+            self, workspace_id: str, customer_name: str, ind: int,
+            source_configuration: Mapping[str, Any],
+            streams_configuration: Mapping[str, Any]
+    ) -> Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
+        name = 'intercom-conversations'
+        customer_name = self.__transform_name(customer_name)
+
+        self.destination_configuration['s3_bucket_path'] = \
+            'source-name={}/customer-name={}/source-index={}'.format(
+                name, customer_name, ind
+            )
+
+        response, error_map = self.connection_create_safe_full(
+            workspace_id, self.name + ' | ' + str(ind),
+            'destination', '${SOURCE_NAMESPACE}', '',
+            self.source_definition_id, source_configuration,
+            self.destination_definition_id, self.destination_configuration,
+            streams_configuration,
+            'active',
+            schedule=self.schedule
+        )
+        return response, error_map
+
     def enable(
             self, workspace_id: str, customer_name: str, ind: int, access_token: str,
             start_date: Optional[str] = None, excluded_names: Optional[List[str]] = None, 
