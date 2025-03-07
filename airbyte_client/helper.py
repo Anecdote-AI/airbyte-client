@@ -1473,6 +1473,7 @@ class IntercomConversationsMetadata(AnecdoteConnection):
             s3_endpoint, s3_path_format,
             s3_file_name_pattern
         )
+        self.schedule = schedule
 
     def connect(
             self, workspace_id: str, customer_name: str, ind: int,
@@ -1486,6 +1487,18 @@ class IntercomConversationsMetadata(AnecdoteConnection):
             'source-name={}/customer-name={}/source-index={}'.format(
                 name, customer_name, ind
             )
+        
+        # If schedule is not set, set it to a default value
+        if self.schedule is None:
+            self.schedule = {
+                "schedule_type": "cron",
+                "schedule_data": {
+                    "cron": {
+                        "cronTimeZone": "UTC",
+                        "cronExpression": "0 0 * * * ?"
+                    }
+                }
+            }
 
         connection_name = self.name + ' | ' + str(ind)
         response, error_map = self.connection_create_safe_full(
@@ -1495,7 +1508,8 @@ class IntercomConversationsMetadata(AnecdoteConnection):
             self.destination_definition_id, self.destination_configuration,
             streams_configuration,
             'active',
-            schedule=self.schedule
+            schedule_type=self.schedule.get("schedule_type"),
+            schedule_data=self.schedule.get("schedule_data")
         )
         return response, error_map
 
