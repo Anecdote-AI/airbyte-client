@@ -2244,6 +2244,7 @@ class ZendeskSupportMetadataBase(AnecdoteConnection):
             s3_file_name_pattern
         )
         self.stream_name = stream_name
+        self.schedule = schedule
 
     def get_stream_config(self) -> Mapping[str, Any]:
         """Template method to be implemented by subclasses"""
@@ -2270,6 +2271,18 @@ class ZendeskSupportMetadataBase(AnecdoteConnection):
             '{}/source-name={}/customer-name={}/source-index={}'.format(
                 self.stream_name, name, customer_name, ind
             )
+        
+        # If schedule is not set, set it to a default value
+        if self.schedule is None:
+            self.schedule = {
+                "schedule_type": "cron",
+                "schedule_data": {
+                    "cron": {
+                        "cronTimeZone": "UTC",
+                        "cronExpression": "0 0 * * * ?"
+                    }
+                }
+            }
 
         connection_name = self.name + ' ' + self.get_connection_name_suffix() + ' | ' + str(ind)
         response, error_map = self.connection_create_safe_full(
@@ -2279,7 +2292,8 @@ class ZendeskSupportMetadataBase(AnecdoteConnection):
             self.destination_definition_id, self.destination_configuration,
             streams_configuration,
             'active',
-            schedule=self.schedule
+            schedule_type=self.schedule.get("schedule_type"),
+            schedule_data=self.schedule.get("schedule_data")
         )
         return response, error_map
 
