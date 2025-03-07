@@ -2227,12 +2227,13 @@ class ZendeskSupportMetadataBase(AnecdoteConnection):
     """Base class for all Zendesk Support metadata connections"""
     
     def __init__(
-            self, airbyte_client: Client, stream_name: str, source_definition_id: str, destination_definition_id: str,
+            self, airbyte_client: Client, source_definition_id: str, destination_definition_id: str,
             s3_bucket_name: str, s3_bucket_region: str, s3_format: Mapping[str, Any],
             schedule: Optional[Mapping[str, Any]] = None,
             s3_access_key_id: Optional[str] = None, s3_secret_access_key: Optional[str] = None,
             s3_endpoint: Optional[str] = None, s3_path_format: Optional[str] = None,
-            s3_file_name_pattern: Optional[str] = None
+            s3_file_name_pattern: Optional[str] = None,
+            stream_name: str = None
     ):
         super().__init__(
             airbyte_client, 'Zendesk Support Metadata', source_definition_id, destination_definition_id,
