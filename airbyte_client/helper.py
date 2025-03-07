@@ -2124,14 +2124,66 @@ class ZendeskSupport(AnecdoteConnection):
             s3_endpoint, s3_path_format,
             s3_file_name_pattern
         )
+        
+        # Create metadata connection handlers
+        metadata_bucket_name = "anecdote-dwh-metadata-bucket"
+        metadata_path_format = """${NAMESPACE}/year=${YEAR}/month=${MONTH}/day=${DAY}/${EPOCH}_"""
+        # No change in schedule
+        metadata_schedule = schedule
+        
+        # Initialize metadata handlers for different streams
+        self.metadata_handlers = {
+            'users': ZendeskSupportUsersMetadata(
+                airbyte_client, source_definition_id, destination_definition_id,
+                metadata_bucket_name, s3_bucket_region, s3_format,
+                metadata_schedule, s3_access_key_id, s3_secret_access_key,
+                s3_endpoint, metadata_path_format, s3_file_name_pattern
+            ),
+            'brands': ZendeskSupportBrandsMetadata(
+                airbyte_client, source_definition_id, destination_definition_id,
+                metadata_bucket_name, s3_bucket_region, s3_format,
+                metadata_schedule, s3_access_key_id, s3_secret_access_key,
+                s3_endpoint, metadata_path_format, s3_file_name_pattern
+            ),
+            'groups': ZendeskSupportGroupsMetadata(
+                airbyte_client, source_definition_id, destination_definition_id,
+                metadata_bucket_name, s3_bucket_region, s3_format,
+                metadata_schedule, s3_access_key_id, s3_secret_access_key,
+                s3_endpoint, metadata_path_format, s3_file_name_pattern
+            ),
+            'organization_memberships': ZendeskSupportOrgMembershipsMetadata(
+                airbyte_client, source_definition_id, destination_definition_id,
+                metadata_bucket_name, s3_bucket_region, s3_format,
+                metadata_schedule, s3_access_key_id, s3_secret_access_key,
+                s3_endpoint, metadata_path_format, s3_file_name_pattern
+            ),
+            'ticket_fields': ZendeskSupportTicketFieldsMetadata(
+                airbyte_client, source_definition_id, destination_definition_id,
+                metadata_bucket_name, s3_bucket_region, s3_format,
+                metadata_schedule, s3_access_key_id, s3_secret_access_key,
+                s3_endpoint, metadata_path_format, s3_file_name_pattern
+            )
+        }
 
     def enable(
             self, workspace_id: str, customer_name: str, ind: int, subdomain: str, credentials: Mapping[str, Any],
             start_date: Optional[str] = None,
     ) -> Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
         if start_date is None:
-            start_date = '2022-01-01'
+            start_date = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
 
+        metadata_start_date = '2000-01-01'
+
+        # First enable all metadata connections        
+        for handler in self.metadata_handlers.values():
+            metadata_response, metadata_error = handler.enable(
+                workspace_id, customer_name, ind, subdomain, credentials,
+                metadata_start_date
+            )
+            if metadata_error is not None:
+                return metadata_response, metadata_error
+
+        # Then enable the main connection
         source_configuration = {
             'subdomain': subdomain,
             'start_date': start_date + 'T00:00:00Z',
@@ -2143,11 +2195,15 @@ class ZendeskSupport(AnecdoteConnection):
                 'syncMode': 'incremental',
                 'destinationSyncMode': 'append'
             },
-            'ticket_audits': {
+            'tickets': {
                 'syncMode': 'incremental',
                 'destinationSyncMode': 'append',
             },
-            'ticket_fields': {
+            'ticket_comments': {
+                'syncMode': 'incremental',
+                'destinationSyncMode': 'append',
+            },
+            'ticket_metrics': {
                 'syncMode': 'incremental',
                 'destinationSyncMode': 'append',
             }
@@ -2157,4 +2213,157 @@ class ZendeskSupport(AnecdoteConnection):
 
     def disable(self, workspace_id: str, customer_name: str, ind: int) -> \
             Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
+        # First disable all metadata connections
+        for handler in self.metadata_handlers.values():
+            metadata_response, metadata_error = handler.disable(workspace_id, customer_name, ind)
+            if metadata_error is not None:
+                return metadata_response, metadata_error
+                
+        # Then disable the main connection
         return self.disconnect(workspace_id, ind)
+
+
+class ZendeskSupportMetadataBase(AnecdoteConnection):
+    """Base class for all Zendesk Support metadata connections"""
+    
+    def __init__(
+            self, airbyte_client: Client, stream_name: str, source_definition_id: str, destination_definition_id: str,
+            s3_bucket_name: str, s3_bucket_region: str, s3_format: Mapping[str, Any],
+            schedule: Optional[Mapping[str, Any]] = None,
+            s3_access_key_id: Optional[str] = None, s3_secret_access_key: Optional[str] = None,
+            s3_endpoint: Optional[str] = None, s3_path_format: Optional[str] = None,
+            s3_file_name_pattern: Optional[str] = None
+    ):
+        super().__init__(
+            airbyte_client, 'Zendesk Support Metadata', source_definition_id, destination_definition_id,
+            s3_bucket_name, s3_bucket_region, s3_format,
+            schedule,
+            s3_access_key_id, s3_secret_access_key,
+            s3_endpoint, s3_path_format,
+            s3_file_name_pattern
+        )
+        self.stream_name = stream_name
+
+    def get_stream_config(self) -> Mapping[str, Any]:
+        """Template method to be implemented by subclasses"""
+        raise NotImplementedError("Subclasses must implement get_stream_config")
+
+    def get_connection_name_suffix(self) -> str:
+        """Template method to be implemented by subclasses"""
+        raise NotImplementedError("Subclasses must implement get_connection_name_suffix")
+
+    def connect(
+            self, workspace_id: str, customer_name: str, ind: int,
+            source_configuration: Mapping[str, Any],
+            streams_configuration: Mapping[str, Any]
+    ) -> Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
+        name = 'zendesk-support'
+        customer_name = self.__transform_name(customer_name)
+
+        self.destination_configuration['s3_bucket_path'] = \
+            '{}/source-name={}/customer-name={}/source-index={}'.format(
+                self.stream_name, name, customer_name, ind
+            )
+
+        connection_name = self.name + ' ' + self.get_connection_name_suffix() + ' | ' + str(ind)
+        response, error_map = self.connection_create_safe_full(
+            workspace_id, connection_name,
+            'destination', '${SOURCE_NAMESPACE}', '',
+            self.source_definition_id, source_configuration,
+            self.destination_definition_id, self.destination_configuration,
+            streams_configuration,
+            'active',
+            schedule=self.schedule
+        )
+        return response, error_map
+
+    def enable(
+            self, workspace_id: str, customer_name: str, ind: int, subdomain: str, credentials: Mapping[str, Any],
+            start_date: Optional[str] = None,
+    ) -> Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
+        if start_date is None:
+            start_date = '2000-01-01'
+
+        source_configuration = {
+            'subdomain': subdomain,
+            'start_date': start_date + 'T00:00:00Z',
+            'credentials': credentials
+        }
+
+        streams_configuration = {
+            self.stream_name: self.get_stream_config()
+        }
+
+        return self.connect(workspace_id, customer_name, ind, source_configuration, streams_configuration)
+
+    def disable(self, workspace_id: str, customer_name: str, ind: int) -> \
+            Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
+        return self.disconnect(workspace_id, ind)
+        
+
+class ZendeskSupportUsersMetadata(ZendeskSupportMetadataBase):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, stream_name='users', **kwargs)
+
+    def get_stream_config(self) -> Mapping[str, Any]:
+        return {
+            'syncMode': 'incremental',
+            'destinationSyncMode': 'append'
+        }
+
+    def get_connection_name_suffix(self) -> str:
+        return 'Users'
+
+class ZendeskSupportBrandsMetadata(ZendeskSupportMetadataBase):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, stream_name='brands', **kwargs)
+
+    def get_stream_config(self) -> Mapping[str, Any]:
+        return {
+            'syncMode': 'full_refresh',
+            'destinationSyncMode': 'append'
+        }
+
+    def get_connection_name_suffix(self) -> str:
+        return 'Brands'
+
+class ZendeskSupportGroupsMetadata(ZendeskSupportMetadataBase):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, stream_name='groups', **kwargs)
+
+    def get_stream_config(self) -> Mapping[str, Any]:
+        return {
+            'syncMode': 'incremental',
+            'destinationSyncMode': 'append'
+        }
+
+    def get_connection_name_suffix(self) -> str:
+        return 'Groups'
+
+class ZendeskSupportOrgMembershipsMetadata(ZendeskSupportMetadataBase):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, stream_name='organization_memberships', **kwargs)
+
+    def get_stream_config(self) -> Mapping[str, Any]:
+        return {
+            'syncMode': 'incremental',
+            'destinationSyncMode': 'append'
+        }
+
+    def get_connection_name_suffix(self) -> str:
+        return 'Organization Memberships'
+
+class ZendeskSupportTicketFieldsMetadata(ZendeskSupportMetadataBase):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, stream_name='ticket_fields', **kwargs)
+
+    def get_stream_config(self) -> Mapping[str, Any]:
+        return {
+            'syncMode': 'incremental',
+            'destinationSyncMode': 'append'
+        }
+
+    def get_connection_name_suffix(self) -> str:
+        return 'Ticket Fields'
+
+
