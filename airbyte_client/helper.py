@@ -2144,36 +2144,46 @@ class ZendeskSupport(AnecdoteConnection):
         metadata_path_format = """${NAMESPACE}/year=${YEAR}/month=${MONTH}/day=${DAY}/${EPOCH}_"""
         # No change in schedule
         metadata_schedule = schedule
+
+        metadata_s3_format = {
+            'format_type': 'Parquet',
+            'page_size_kb': 1024,
+            'block_size_mb': 255,
+            'compression_codec': 'GZIP',
+            'dictionary_encoding': True,
+            'max_padding_size_mb': 8,
+            'dictionary_page_size_kb': 1024
+        }
         
         # Initialize metadata handlers for different streams
         self.metadata_handlers = {
             'users': ZendeskSupportUsersMetadata(
                 airbyte_client, source_definition_id, destination_definition_id,
-                metadata_bucket_name, s3_bucket_region, s3_format,
+                metadata_bucket_name, s3_bucket_region, metadata_s3_format,
                 metadata_schedule, s3_access_key_id, s3_secret_access_key,
                 s3_endpoint, metadata_path_format, s3_file_name_pattern
             ),
             'brands': ZendeskSupportBrandsMetadata(
                 airbyte_client, source_definition_id, destination_definition_id,
-                metadata_bucket_name, s3_bucket_region, s3_format,
+                metadata_bucket_name, s3_bucket_region, metadata_s3_format,
                 metadata_schedule, s3_access_key_id, s3_secret_access_key,
                 s3_endpoint, metadata_path_format, s3_file_name_pattern
             ),
             'groups': ZendeskSupportGroupsMetadata(
                 airbyte_client, source_definition_id, destination_definition_id,
-                metadata_bucket_name, s3_bucket_region, s3_format,
+                metadata_bucket_name, s3_bucket_region, metadata_s3_format,
                 metadata_schedule, s3_access_key_id, s3_secret_access_key,
                 s3_endpoint, metadata_path_format, s3_file_name_pattern
             ),
             'organization_memberships': ZendeskSupportOrgMembershipsMetadata(
                 airbyte_client, source_definition_id, destination_definition_id,
-                metadata_bucket_name, s3_bucket_region, s3_format,
+                metadata_bucket_name, s3_bucket_region, metadata_s3_format,
                 metadata_schedule, s3_access_key_id, s3_secret_access_key,
                 s3_endpoint, metadata_path_format, s3_file_name_pattern
             ),
             'ticket_fields': ZendeskSupportTicketFieldsMetadata(
                 airbyte_client, source_definition_id, destination_definition_id,
-                metadata_bucket_name, s3_bucket_region, s3_format,
+                metadata_bucket_name, s3_bucket_region, metadata_s3_format,
                 metadata_schedule, s3_access_key_id, s3_secret_access_key,
                 s3_endpoint, metadata_path_format, s3_file_name_pattern
             )
