@@ -1523,7 +1523,7 @@ class IntercomConversationsMetadata(AnecdoteConnection):
             },
             'tags': {
                 'syncMode': 'full_refresh',
-                'destinationSyncMode': 'overwrite',
+                'destinationSyncMode': 'append',
             }
         }
 
