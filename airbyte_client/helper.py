@@ -1475,13 +1475,18 @@ class IntercomConversationsMetadata(AnecdoteConnection):
         )
         self.schedule = schedule
 
+    @staticmethod
+    def transform_name(name: str) -> str:
+        return name.lower().replace(' ', '-').replace('\t', '-') \
+            .replace('\n', '-').replace('\r', '-').replace('_', '-')
+
     def connect(
             self, workspace_id: str, customer_name: str, ind: int,
             source_configuration: Mapping[str, Any],
             streams_configuration: Mapping[str, Any]
     ) -> Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
         name = 'intercom-conversations'
-        customer_name = self.__transform_name(customer_name)
+        customer_name = self.transform_name(customer_name)
 
         self.destination_configuration['s3_bucket_path'] = \
             'source-name={}/customer-name={}/source-index={}'.format(
