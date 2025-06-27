@@ -2082,6 +2082,56 @@ class TwitterMentions(AnecdoteConnection):
         return self.disconnect(workspace_id, ind)
 
 
+
+class TwitterTweets(AnecdoteConnection):
+    def __init__(
+            self, airbyte_client: Client, source_definition_id: str, destination_definition_id: str,
+            s3_bucket_name: str, s3_bucket_region: str, s3_format: Mapping[str, Any],
+            schedule: Optional[Mapping[str, Any]] = None,
+            s3_access_key_id: Optional[str] = None, s3_secret_access_key: Optional[str] = None,
+            s3_endpoint: Optional[str] = None, s3_path_format: Optional[str] = None,
+            s3_file_name_pattern: Optional[str] = None
+    ):
+        super().__init__(
+            airbyte_client, 'Twitter Tweets', source_definition_id, destination_definition_id,
+            s3_bucket_name, s3_bucket_region, s3_format,
+            schedule,
+            s3_access_key_id, s3_secret_access_key,
+            s3_endpoint, s3_path_format,
+            s3_file_name_pattern
+        )
+
+    def enable(
+            self, workspace_id: str, customer_name: str, ind: int, apify_api_token: str, search_query: str,
+            start_date: Optional[str] = None,
+            timeout_milliseconds: Optional[int] = None
+    ) -> Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
+        if start_date is None:
+            start_date = (datetime.today() - timedelta(days=6)).strftime('%Y-%m-%d')
+
+        source_configuration = {
+            'apify_api_token': apify_api_token,
+            'search_query': search_query,
+            'start_date': start_date,
+        }
+
+        streams_configuration = {
+            'tweets': {
+                'syncMode': 'incremental',
+                'destinationSyncMode': 'append',
+            }
+        }
+
+        return self.connect(workspace_id, customer_name, ind, source_configuration, streams_configuration)
+
+    def disable(self, workspace_id: str, customer_name: str, ind: int) -> \
+            Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
+        return self.disconnect(workspace_id, ind)
+
+
+
+
+
 class Typeform(AnecdoteConnection):
     def __init__(
             self, airbyte_client: Client, source_definition_id: str, destination_definition_id: str,
@@ -2414,5 +2464,7 @@ class ZendeskSupportTicketFieldsMetadata(ZendeskSupportMetadataBase):
 
     def get_connection_name_suffix(self) -> str:
         return 'Ticket Fields'
+
+
 
 
