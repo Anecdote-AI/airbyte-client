@@ -2154,7 +2154,7 @@ class ZendeskConversations(AnecdoteConnection):
 
         if use_search_endpoint is None:
             use_search_endpoint = False
-        if (use_search_endpoint == True) and (query is None):
+        if (use_search_endpoint == True) and (query is None or query == ''):
             raise ValueError("query is required when use_search_endpoint is True")
 
         source_configuration = {
