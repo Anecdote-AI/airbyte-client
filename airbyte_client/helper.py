@@ -8,6 +8,75 @@ from airbyte_client.client import Base, Client
 
 
 class Helper(Base):
+
+    def _parse_discover_schema_error(self, data: Mapping[str, Any]) -> Mapping[str, Any]:
+        """Parse specific error patterns from discover schema response and return appropriate error messages."""
+        
+        # Check if there's job info with failure reason
+        if 'jobInfo' in data and 'failureReason' in data['jobInfo']:
+            failure_reason = data['jobInfo']['failureReason']
+            internal_message = failure_reason.get('internalMessage', '')
+            
+            # Check for date format errors
+            if 'time data' in internal_message and 'does not match format' in internal_message:
+                # Extract the problematic date and expected format from the error
+                if '%Y-%m-%dT%H:%M:%SZ' in internal_message:
+                    return {
+                        'error_code': 400,
+                        'error_str': 'Invalid date format: start_date must be in ISO format (YYYY-MM-DDTHH:MM:SSZ), e.g., "2021-01-01T00:00:00Z"'
+                    }
+                else:
+                    return {
+                        'error_code': 400,
+                        'error_str': f'Date format error: {internal_message}'
+                    }
+            
+            # Check for authentication errors
+            if 'auth' in internal_message.lower() or 'token' in internal_message.lower() or 'credential' in internal_message.lower():
+                return {
+                    'error_code': 401,
+                    'error_str': f'Authentication error: {internal_message}'
+                }
+            
+            # Check for configuration errors
+            if 'config' in internal_message.lower():
+                return {
+                    'error_code': 400,
+                    'error_str': f'Configuration error: {internal_message}'
+                }
+            
+            # Check for connection errors
+            if 'connection' in internal_message.lower() or 'network' in internal_message.lower() or 'timeout' in internal_message.lower():
+                return {
+                    'error_code': 503,
+                    'error_str': f'Connection error: {internal_message}'
+                }
+            
+            # Return the internal message if available but no specific pattern matched
+            if internal_message:
+                return {
+                    'error_code': 500,
+                    'error_str': f'Connector error: {internal_message}'
+                }
+        
+        # Check for logs with error messages
+        if 'logs' in data and 'events' in data['logs']:
+            for event in data['logs']['events']:
+                if event.get('level') == 'error':
+                    error_message = event.get('message', '')
+                    if 'time data' in error_message and 'does not match format' in error_message:
+                        if '%Y-%m-%dT%H:%M:%SZ' in error_message:
+                            return {
+                                'error_code': 400,
+                                'error_str': 'Invalid date format: start_date must be in ISO format (YYYY-MM-DDTHH:MM:SSZ), e.g., "2021-01-01T00:00:00Z"'
+                            }
+        
+        # Default generic error if no specific pattern is found
+        return {
+            'error_code': 500,
+            'error_str': 'Internal error: no streams in Airbyte discover schema response. Please, retry later'
+        }
+
     def workspace_create_safe(self, name: str, email: Optional[str] = None, webhook_url: Optional[str] = None) -> \
             Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
         response = self.airbyte_client.workspaces().list()
@@ -319,9 +388,9 @@ class Helper(Base):
                 continue
             data = response.json()
             if ('catalog' not in data) or ('streams' not in data['catalog']):
-                print(data)
-                err = {'error_code': 500,
-                       'error_str': 'Internal error: no streams in Airbyte discover schema response. Please, retry later'}
+                # print(data)
+                # Check for specific error patterns in the response
+                err = self._parse_discover_schema_error(data)
                 print(i, err)
                 continue
 
@@ -2201,6 +2270,12 @@ class ZendeskConversations(AnecdoteConnection):
     ) -> Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
         if start_date is None:
             start_date = (datetime.today() - timedelta(days=6)).strftime('%Y-%m-%dT%H:%M:%SZ')
+        else:
+            # Ensure start_date is in the correct format
+            if 'T' not in start_date:
+                start_date = start_date + 'T00:00:00Z'
+            elif not start_date.endswith('Z'):
+                start_date = start_date + 'Z'
 
         if use_search_endpoint is None:
             use_search_endpoint = False
