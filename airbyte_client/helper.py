@@ -1799,6 +1799,68 @@ class RedditApi(AnecdoteConnection):
             Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
         return self.disconnect(workspace_id, ind)
 
+
+class Discourse(AnecdoteConnection):
+    def __init__(
+            self, airbyte_client: Client, source_definition_id: str, destination_definition_id: str,
+            s3_bucket_name: str, s3_bucket_region: str, s3_format: Mapping[str, Any],
+            schedule: Optional[Mapping[str, Any]] = None,
+            s3_access_key_id: Optional[str] = None, s3_secret_access_key: Optional[str] = None,
+            s3_endpoint: Optional[str] = None, s3_path_format: Optional[str] = None,
+            s3_file_name_pattern: Optional[str] = None
+    ):
+        super().__init__(
+            airbyte_client, 'Discourse', source_definition_id, destination_definition_id,
+            s3_bucket_name, s3_bucket_region, s3_format,
+            schedule,
+            s3_access_key_id, s3_secret_access_key,
+            s3_endpoint, s3_path_format,
+            s3_file_name_pattern
+        )
+
+    def enable(
+            self, workspace_id: str, customer_name: str, ind: int, base_url: str,
+            start_date: Optional[str] = None
+    ) -> Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
+        if start_date is None:
+            start_date = (datetime.today() - timedelta(days=180)).strftime('%Y-%m-%dT%H:%M:%SZ')
+        else:
+            # Ensure start_date is in the correct format
+            if 'T' not in start_date:
+                start_date = start_date + 'T00:00:00Z'
+            elif not start_date.endswith('Z'):
+                start_date = start_date + 'Z'
+
+        source_configuration = {
+            'base_url': base_url,
+            'start_date': start_date,
+        }
+
+        streams_configuration = {
+            'categories': {
+                'syncMode': 'full_refresh',
+                'destinationSyncMode': 'overwrite',
+            },
+            'topics': {
+                'syncMode': 'incremental',
+                'destinationSyncMode': 'append',
+            },
+            'posts': {
+                'syncMode': 'incremental',
+                'destinationSyncMode': 'append',
+            },
+            'tags': {
+                'syncMode': 'full_refresh',
+                'destinationSyncMode': 'overwrite',
+            }
+        }
+        return self.connect(workspace_id, customer_name, ind, source_configuration, streams_configuration)
+
+    def disable(self, workspace_id: str, customer_name: str, ind: int) -> \
+            Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
+        return self.disconnect(workspace_id, ind)
+
+
 class SendBird(AnecdoteConnection):
     def __init__(
             self, airbyte_client: Client, source_definition_id: str, destination_definition_id: str,
