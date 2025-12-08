@@ -2103,7 +2103,7 @@ class Tiktok(AnecdoteConnection):
         }
 
         streams_configuration = {
-            'posts': {
+            'comments': {
                 'syncMode': 'incremental',
                 'destinationSyncMode': 'append',
             }
