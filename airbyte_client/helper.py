@@ -2116,6 +2116,69 @@ class Tiktok(AnecdoteConnection):
         return self.disconnect(workspace_id, ind)
 
 
+class TiktokSearch(AnecdoteConnection):
+    def __init__(
+            self, airbyte_client: Client, source_definition_id: str, destination_definition_id: str,
+            s3_bucket_name: str, s3_bucket_region: str, s3_format: Mapping[str, Any],
+            schedule: Optional[Mapping[str, Any]] = None,
+            s3_access_key_id: Optional[str] = None, s3_secret_access_key: Optional[str] = None,
+            s3_endpoint: Optional[str] = None, s3_path_format: Optional[str] = None,
+            s3_file_name_pattern: Optional[str] = None
+    ):
+        super().__init__(
+            airbyte_client, 'Tiktok Search', source_definition_id, destination_definition_id,
+            s3_bucket_name, s3_bucket_region, s3_format,
+            schedule,
+            s3_access_key_id, s3_secret_access_key,
+            s3_endpoint, s3_path_format,
+            s3_file_name_pattern
+        )
+
+    def enable(
+            self, workspace_id: str, customer_name: str, ind: int,
+            apify_token: str, search_queries: List[str],
+            results_per_page: Optional[int] = None,
+            max_profiles_per_query: Optional[int] = None,
+            search_sorting: Optional[str] = None,
+            search_date_posted: Optional[str] = None,
+            scrape_comments: Optional[bool] = None,
+            max_comments_per_post: Optional[int] = None,
+            max_replies_per_comment: Optional[int] = None,
+    ) -> Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
+        source_configuration = {
+            'apify_token': apify_token,
+            'search_queries': search_queries,
+        }
+
+        if results_per_page is not None:
+            source_configuration['results_per_page'] = results_per_page
+        if max_profiles_per_query is not None:
+            source_configuration['max_profiles_per_query'] = max_profiles_per_query
+        if search_sorting is not None:
+            source_configuration['search_sorting'] = search_sorting
+        if search_date_posted is not None:
+            source_configuration['search_date_posted'] = search_date_posted
+        if scrape_comments is not None:
+            source_configuration['scrape_comments'] = scrape_comments
+        if max_comments_per_post is not None:
+            source_configuration['max_comments_per_post'] = max_comments_per_post
+        if max_replies_per_comment is not None:
+            source_configuration['max_replies_per_comment'] = max_replies_per_comment
+
+        streams_configuration = {
+            'search_results': {
+                'syncMode': 'full_refresh',
+                'destinationSyncMode': 'append',
+            }
+        }
+
+        return self.connect(workspace_id, customer_name, ind, source_configuration, streams_configuration)
+
+    def disable(self, workspace_id: str, customer_name: str, ind: int) -> \
+            Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
+        return self.disconnect(workspace_id, ind)
+
+
 class TrustpilotScraper(AnecdoteConnection):
     def __init__(
             self, airbyte_client: Client, source_definition_id: str, destination_definition_id: str,
