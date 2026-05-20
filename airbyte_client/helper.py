@@ -2328,12 +2328,15 @@ class ZendeskConversations(AnecdoteConnection):
     def enable(
             self, workspace_id: str, customer_name: str, ind: int, subdomain: str, credentials: Mapping[str, Any],
             use_search_endpoint: Optional[bool] = None, query: Optional[str] = None,
-            start_date: Optional[str] = None
+            start_date: Optional[str] = None,
+            update_database: Optional[bool] = None, source_id: Optional[int] = None,
+            db_host: Optional[str] = None, db_port: Optional[str] = None,
+            db_name: Optional[str] = None, db_user: Optional[str] = None,
+            db_password: Optional[str] = None
     ) -> Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
         if start_date is None:
             start_date = (datetime.today() - timedelta(days=6)).strftime('%Y-%m-%dT%H:%M:%SZ')
         else:
-            # Ensure start_date is in the correct format
             if 'T' not in start_date:
                 start_date = start_date + 'T00:00:00Z'
             elif not start_date.endswith('Z'):
@@ -2351,6 +2354,15 @@ class ZendeskConversations(AnecdoteConnection):
             'use_search_endpoint': use_search_endpoint,
             'query': query,
         }
+
+        if update_database:
+            source_configuration['update_database'] = update_database
+            source_configuration['source_id'] = source_id
+            source_configuration['db_host'] = db_host
+            source_configuration['db_port'] = db_port
+            source_configuration['db_name'] = db_name
+            source_configuration['db_user'] = db_user
+            source_configuration['db_password'] = db_password
 
         streams_configuration = {
             'conversations': {
