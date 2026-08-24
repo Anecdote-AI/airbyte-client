@@ -2198,14 +2198,17 @@ class TrustpilotScraper(AnecdoteConnection):
         )
 
     def enable(
-            self, workspace_id: str, customer_name: str, ind: int, app_name: str,
+            self, workspace_id: str, customer_name: str, ind: int, apify_token: str, app_name: str,
             start_date: Optional[str] = None,
             timeout_milliseconds: Optional[int] = None
     ) -> Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
         if start_date is None:
             start_date = '2022-01-01'
 
+        # Trustpilot blocks direct scraping; reviews are fetched via an Apify
+        # actor, so apify_token is required (see source-trustpilot-scraper).
         source_configuration = {
+            'apify_token': apify_token,
             'app_name': app_name,
             'start_date': start_date
         }
