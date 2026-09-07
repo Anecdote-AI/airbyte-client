@@ -947,6 +947,68 @@ class AppStoreRSS(AnecdoteConnection):
         return self.disconnect(workspace_id, ind)
 
 
+class BookingReviews(AnecdoteConnection):
+    def __init__(
+            self, airbyte_client: Client, source_definition_id: str, destination_definition_id: str,
+            s3_bucket_name: str, s3_bucket_region: str, s3_format: Mapping[str, Any],
+            schedule: Optional[Mapping[str, Any]] = None,
+            s3_access_key_id: Optional[str] = None, s3_secret_access_key: Optional[str] = None,
+            s3_endpoint: Optional[str] = None, s3_path_format: Optional[str] = None,
+            s3_file_name_pattern: Optional[str] = None
+    ):
+        # 'Booking Reviews' lowercases to the 'booking-reviews' S3 partition that
+        # anecdote-pipeline keys its preprocessor on — renaming this moves the data
+        # somewhere the pipeline does not look.
+        super().__init__(
+            airbyte_client, 'Booking Reviews', source_definition_id, destination_definition_id,
+            s3_bucket_name, s3_bucket_region, s3_format,
+            schedule,
+            s3_access_key_id, s3_secret_access_key,
+            s3_endpoint, s3_path_format,
+            s3_file_name_pattern
+        )
+
+    def enable(
+            self, workspace_id: str, customer_name: str, ind: int, start_urls: List[str], apify_token: str,
+            start_date: Optional[str] = None, max_reviews_per_hotel: Optional[int] = None,
+            review_scores: Optional[List[str]] = None, sort_reviews_by: Optional[str] = None,
+            lookback_days: Optional[int] = None, urls_per_run: Optional[int] = None,
+            parallel_runs: Optional[int] = None
+    ) -> Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
+        if start_date is None:
+            start_date = '2022-01-01'
+
+        source_configuration = {
+            'start_urls': start_urls,
+            'apify_token': apify_token,
+            'start_date': start_date,
+        }
+
+        # Left out when not given so the connector spec's own default applies, rather
+        # than overwriting it with a null.
+        optional_configuration = {
+            'max_reviews_per_hotel': max_reviews_per_hotel,
+            'review_scores': review_scores,
+            'sort_reviews_by': sort_reviews_by,
+            'lookback_days': lookback_days,
+            'urls_per_run': urls_per_run,
+            'parallel_runs': parallel_runs,
+        }
+        source_configuration.update({k: v for k, v in optional_configuration.items() if v is not None})
+
+        streams_configuration = {
+            'reviews': {
+                'syncMode': 'incremental',
+                'destinationSyncMode': 'append',
+            }
+        }
+        return self.connect(workspace_id, customer_name, ind, source_configuration, streams_configuration)
+
+    def disable(self, workspace_id: str, customer_name: str, ind: int) -> \
+            Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
+        return self.disconnect(workspace_id, ind)
+
+
 class Delighted(AnecdoteConnection):
     def __init__(
             self, airbyte_client: Client, source_definition_id: str, destination_definition_id: str,
@@ -2172,6 +2234,125 @@ class TiktokSearch(AnecdoteConnection):
             }
         }
 
+        return self.connect(workspace_id, customer_name, ind, source_configuration, streams_configuration)
+
+    def disable(self, workspace_id: str, customer_name: str, ind: int) -> \
+            Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
+        return self.disconnect(workspace_id, ind)
+
+
+class TripadvisorReviews(AnecdoteConnection):
+    def __init__(
+            self, airbyte_client: Client, source_definition_id: str, destination_definition_id: str,
+            s3_bucket_name: str, s3_bucket_region: str, s3_format: Mapping[str, Any],
+            schedule: Optional[Mapping[str, Any]] = None,
+            s3_access_key_id: Optional[str] = None, s3_secret_access_key: Optional[str] = None,
+            s3_endpoint: Optional[str] = None, s3_path_format: Optional[str] = None,
+            s3_file_name_pattern: Optional[str] = None
+    ):
+        # 'Tripadvisor Reviews' lowercases to the 'tripadvisor-reviews' S3 partition that
+        # anecdote-pipeline keys its preprocessor on — renaming this moves the data
+        # somewhere the pipeline does not look.
+        super().__init__(
+            airbyte_client, 'Tripadvisor Reviews', source_definition_id, destination_definition_id,
+            s3_bucket_name, s3_bucket_region, s3_format,
+            schedule,
+            s3_access_key_id, s3_secret_access_key,
+            s3_endpoint, s3_path_format,
+            s3_file_name_pattern
+        )
+
+    def enable(
+            self, workspace_id: str, customer_name: str, ind: int, start_urls: List[str], apify_token: str,
+            start_date: Optional[str] = None, lookback_days: Optional[int] = None,
+            urls_per_run: Optional[int] = None, parallel_runs: Optional[int] = None
+    ) -> Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
+        if start_date is None:
+            start_date = '2022-01-01'
+
+        source_configuration = {
+            'start_urls': start_urls,
+            'apify_token': apify_token,
+            'start_date': start_date,
+        }
+
+        # Left out when not given so the connector spec's own default applies, rather
+        # than overwriting it with a null.
+        optional_configuration = {
+            'lookback_days': lookback_days,
+            'urls_per_run': urls_per_run,
+            'parallel_runs': parallel_runs,
+        }
+        source_configuration.update({k: v for k, v in optional_configuration.items() if v is not None})
+
+        streams_configuration = {
+            'reviews': {
+                'syncMode': 'incremental',
+                'destinationSyncMode': 'append',
+            }
+        }
+        return self.connect(workspace_id, customer_name, ind, source_configuration, streams_configuration)
+
+    def disable(self, workspace_id: str, customer_name: str, ind: int) -> \
+            Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
+        return self.disconnect(workspace_id, ind)
+
+
+class TripComReviews(AnecdoteConnection):
+    def __init__(
+            self, airbyte_client: Client, source_definition_id: str, destination_definition_id: str,
+            s3_bucket_name: str, s3_bucket_region: str, s3_format: Mapping[str, Any],
+            schedule: Optional[Mapping[str, Any]] = None,
+            s3_access_key_id: Optional[str] = None, s3_secret_access_key: Optional[str] = None,
+            s3_endpoint: Optional[str] = None, s3_path_format: Optional[str] = None,
+            s3_file_name_pattern: Optional[str] = None
+    ):
+        # Deliberately 'Trip Com Reviews' and not 'Trip.com Reviews': this name is
+        # lowercased into the S3 partition 'source-name=...', and the transform replaces
+        # spaces but not dots, so 'Trip.com Reviews' would land in 'trip.com-reviews'
+        # while anecdote-pipeline keys its preprocessor on 'trip-com-reviews'. The
+        # customer-facing name lives in source_definitions.public_name instead.
+        super().__init__(
+            airbyte_client, 'Trip Com Reviews', source_definition_id, destination_definition_id,
+            s3_bucket_name, s3_bucket_region, s3_format,
+            schedule,
+            s3_access_key_id, s3_secret_access_key,
+            s3_endpoint, s3_path_format,
+            s3_file_name_pattern
+        )
+
+    def enable(
+            self, workspace_id: str, customer_name: str, ind: int, hotel_urls: List[str], apify_token: str,
+            start_date: Optional[str] = None, max_reviews: Optional[int] = None,
+            lookback_days: Optional[int] = None, parallel_runs: Optional[int] = None,
+            sort_by: Optional[str] = None
+    ) -> Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
+        if start_date is None:
+            start_date = '2022-01-01'
+
+        source_configuration = {
+            'hotel_urls': hotel_urls,
+            'apify_token': apify_token,
+            'start_date': start_date,
+        }
+
+        # Left out when not given so the connector spec's own default applies, rather
+        # than overwriting it with a null. sort_by defaults to an empty string in the
+        # spec, so an empty value is a real choice and is passed through.
+        optional_configuration = {
+            'max_reviews': max_reviews,
+            'lookback_days': lookback_days,
+            'parallel_runs': parallel_runs,
+            'sort_by': sort_by,
+        }
+        source_configuration.update({k: v for k, v in optional_configuration.items() if v is not None})
+
+        streams_configuration = {
+            'reviews': {
+                'syncMode': 'incremental',
+                'destinationSyncMode': 'append',
+            }
+        }
         return self.connect(workspace_id, customer_name, ind, source_configuration, streams_configuration)
 
     def disable(self, workspace_id: str, customer_name: str, ind: int) -> \
