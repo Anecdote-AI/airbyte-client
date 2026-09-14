@@ -743,7 +743,11 @@ class ApifyInstagramPosts(AnecdoteConnection):
     def enable(
             self, workspace_id: str, customer_name: str, ind: int,
             apify_token: str, start_urls: List[str],
-            start_date: Optional[str] = None
+            start_date: Optional[str] = None, collect_comments: Optional[bool] = None,
+            posts_limit: Optional[int] = None, max_comments_per_post: Optional[int] = None,
+            backfill_comments_limit: Optional[int] = None, comment_fetch_safety: Optional[str] = None,
+            post_lookback_days: Optional[int] = None, include_nested_comments: Optional[bool] = None,
+            include_reels_feed: Optional[bool] = None
     ) -> Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
         if start_date is None:
             start_date = (datetime.today() - timedelta(days=6)).strftime('%Y-%m-%d')
@@ -753,6 +757,21 @@ class ApifyInstagramPosts(AnecdoteConnection):
             'start_urls': start_urls,
             'start_date': start_date,
         }
+
+        # Left out when not given so the connector spec's own default applies, rather
+        # than overwriting it with a null. `is not None` rather than truthiness: False
+        # and 0 are meaningful here (comments off, no first-sight backfill).
+        optional_configuration = {
+            'collect_comments': collect_comments,
+            'posts_limit': posts_limit,
+            'max_comments_per_post': max_comments_per_post,
+            'backfill_comments_limit': backfill_comments_limit,
+            'comment_fetch_safety': comment_fetch_safety,
+            'post_lookback_days': post_lookback_days,
+            'include_nested_comments': include_nested_comments,
+            'include_reels_feed': include_reels_feed,
+        }
+        source_configuration.update({k: v for k, v in optional_configuration.items() if v is not None})
 
         streams_configuration = {
             'posts': {
@@ -1230,7 +1249,9 @@ class GoogleMapsReviews(AnecdoteConnection):
 
     def enable(
             self, workspace_id: str, customer_name: str, ind: int, urls: List[str], apify_token: str,
-            start_date: Optional[str] = None
+            start_date: Optional[str] = None, max_reviews: Optional[int] = None,
+            include_reviewer_details: Optional[bool] = None,
+            reviewer_max_per_sync: Optional[int] = None, reviewer_max_items: Optional[int] = None
     ) -> Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
         if start_date is None:
             start_date = '2022-01-01'
@@ -1240,6 +1261,17 @@ class GoogleMapsReviews(AnecdoteConnection):
             'apify_token': apify_token,
             'start_date': start_date,
         }
+
+        # Left out when not given so the connector spec's own default applies, rather
+        # than overwriting it with a null. `is not None` rather than truthiness: False
+        # is meaningful here (reviewer enrichment explicitly off).
+        optional_configuration = {
+            'max_reviews': max_reviews,
+            'include_reviewer_details': include_reviewer_details,
+            'reviewer_max_per_sync': reviewer_max_per_sync,
+            'reviewer_max_items': reviewer_max_items,
+        }
+        source_configuration.update({k: v for k, v in optional_configuration.items() if v is not None})
 
         streams_configuration = {
             'reviews': {
