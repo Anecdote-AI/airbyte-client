@@ -1758,6 +1758,92 @@ class Kustomer(AnecdoteConnection):
         return self.disconnect(workspace_id, ind)
 
 
+class LinkedInPosts(AnecdoteConnection):
+    def __init__(
+            self, airbyte_client: Client, source_definition_id: str, destination_definition_id: str,
+            s3_bucket_name: str, s3_bucket_region: str, s3_format: Mapping[str, Any],
+            schedule: Optional[Mapping[str, Any]] = None,
+            s3_access_key_id: Optional[str] = None, s3_secret_access_key: Optional[str] = None,
+            s3_endpoint: Optional[str] = None, s3_path_format: Optional[str] = None,
+            s3_file_name_pattern: Optional[str] = None
+    ):
+        # 'LinkedIn' lowercases to the 'linkedin' S3 partition that anecdote-pipeline
+        # keys its preprocessor on (see misc.py), and names connections 'LinkedIn | <ind>'
+        # the way the ones created by hand in the Airbyte UI already are.
+        super().__init__(
+            airbyte_client, 'LinkedIn', source_definition_id, destination_definition_id,
+            s3_bucket_name, s3_bucket_region, s3_format,
+            schedule,
+            s3_access_key_id, s3_secret_access_key,
+            s3_endpoint, s3_path_format,
+            s3_file_name_pattern
+        )
+
+    def enable(
+            self, workspace_id: str, customer_name: str, ind: int, apify_token: str,
+            keywords: Optional[List[str]] = None, start_date: Optional[str] = None,
+            max_posts_per_keyword: Optional[int] = None, include_user_details: Optional[bool] = None,
+            sort_by: Optional[str] = None, posted_limit: Optional[str] = None,
+            target_urls: Optional[List[str]] = None, target_max_posts: Optional[int] = None,
+            target_posted_limit: Optional[str] = None, include_reposts: Optional[bool] = None,
+            include_quote_posts: Optional[bool] = None, collect_comments: Optional[bool] = None,
+            comments_start_date: Optional[str] = None, comments_max_per_post: Optional[int] = None,
+            comments_posted_limit: Optional[str] = None, comments_include_replies: Optional[bool] = None
+    ) -> Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
+        if start_date is None:
+            start_date = '2022-01-01'
+
+        # A source is configured either by keywords (post search) or by target URLs
+        # (posts of specific company/profile pages); both are sent every time because
+        # the connector derives its streams from them, and an absent key and an empty
+        # list mean the same thing to it.
+        source_configuration = {
+            'apify_token': apify_token,
+            'start_date': start_date,
+            'keywords': keywords or [],
+            'target_urls': target_urls or [],
+        }
+
+        # Left out when not given so the connector spec's own default applies, rather
+        # than overwriting it with a null.
+        optional_configuration = {
+            'max_posts_per_keyword': max_posts_per_keyword,
+            'include_user_details': include_user_details,
+            'sort_by': sort_by,
+            'posted_limit': posted_limit,
+            'target_max_posts': target_max_posts,
+            'target_posted_limit': target_posted_limit,
+            'include_reposts': include_reposts,
+            'include_quote_posts': include_quote_posts,
+            'collect_comments': collect_comments,
+            'comments_start_date': comments_start_date,
+            'comments_max_per_post': comments_max_per_post,
+            'comments_posted_limit': comments_posted_limit,
+            'comments_include_replies': comments_include_replies,
+        }
+        source_configuration.update({k: v for k, v in optional_configuration.items() if v is not None})
+
+        # The connector exposes 'posts' only when keywords are set and 'target_posts'
+        # only when target URLs are, so schema discovery returns one of the two and the
+        # other is simply absent from the catalog — configuring both here is what lets
+        # one class serve either way of setting the source up.
+        streams_configuration = {
+            'posts': {
+                'syncMode': 'incremental',
+                'destinationSyncMode': 'append',
+            },
+            'target_posts': {
+                'syncMode': 'incremental',
+                'destinationSyncMode': 'append',
+            },
+        }
+        return self.connect(workspace_id, customer_name, ind, source_configuration, streams_configuration)
+
+    def disable(self, workspace_id: str, customer_name: str, ind: int) -> \
+            Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
+        return self.disconnect(workspace_id, ind)
+
+
 class Pendo(AnecdoteConnection):
     def __init__(
             self, airbyte_client: Client, source_definition_id: str, destination_definition_id: str,
