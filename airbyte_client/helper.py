@@ -1844,6 +1844,161 @@ class LinkedInPosts(AnecdoteConnection):
         return self.disconnect(workspace_id, ind)
 
 
+class HackerNews(AnecdoteConnection):
+    def __init__(
+            self, airbyte_client: Client, source_definition_id: str, destination_definition_id: str,
+            s3_bucket_name: str, s3_bucket_region: str, s3_format: Mapping[str, Any],
+            schedule: Optional[Mapping[str, Any]] = None,
+            s3_access_key_id: Optional[str] = None, s3_secret_access_key: Optional[str] = None,
+            s3_endpoint: Optional[str] = None, s3_path_format: Optional[str] = None,
+            s3_file_name_pattern: Optional[str] = None
+    ):
+        super().__init__(
+            airbyte_client, 'Hacker News', source_definition_id, destination_definition_id,
+            s3_bucket_name, s3_bucket_region, s3_format,
+            schedule,
+            s3_access_key_id, s3_secret_access_key,
+            s3_endpoint, s3_path_format,
+            s3_file_name_pattern
+        )
+
+    def enable(
+            self, workspace_id: str, customer_name: str, ind: int, queries: List[str], apify_token: str,
+            start_date: Optional[str] = None
+    ) -> Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
+        if start_date is None:
+            start_date = '2022-01-01'
+
+        source_configuration = {
+            'queries': queries,
+            'apify_token': apify_token,
+            'start_date': start_date
+        }
+
+        streams_configuration = {
+            'posts': {
+                'syncMode': 'incremental',
+                'destinationSyncMode': 'append',
+            }
+        }
+        return self.connect(workspace_id, customer_name, ind, source_configuration, streams_configuration)
+
+    def disable(self, workspace_id: str, customer_name: str, ind: int) -> \
+            Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
+        return self.disconnect(workspace_id, ind)
+
+
+class Substack(AnecdoteConnection):
+    def __init__(
+            self, airbyte_client: Client, source_definition_id: str, destination_definition_id: str,
+            s3_bucket_name: str, s3_bucket_region: str, s3_format: Mapping[str, Any],
+            schedule: Optional[Mapping[str, Any]] = None,
+            s3_access_key_id: Optional[str] = None, s3_secret_access_key: Optional[str] = None,
+            s3_endpoint: Optional[str] = None, s3_path_format: Optional[str] = None,
+            s3_file_name_pattern: Optional[str] = None
+    ):
+        super().__init__(
+            airbyte_client, 'Substack', source_definition_id, destination_definition_id,
+            s3_bucket_name, s3_bucket_region, s3_format,
+            schedule,
+            s3_access_key_id, s3_secret_access_key,
+            s3_endpoint, s3_path_format,
+            s3_file_name_pattern
+        )
+
+    def enable(
+            self, workspace_id: str, customer_name: str, ind: int, urls: List[str], apify_token: str,
+            start_date: Optional[str] = None, end_date: Optional[str] = None,
+            max_posts_per_newsletter: Optional[int] = None, only_free: Optional[bool] = None,
+            content_type: Optional[str] = None, include_comments: Optional[bool] = None,
+            apify_memory_mbytes: Optional[int] = None
+    ) -> Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
+        if start_date is None:
+            start_date = '2022-01-01'
+
+        source_configuration = {
+            'urls': urls,
+            'apify_token': apify_token,
+            'start_date': start_date
+        }
+
+        optional_configuration = {
+            'end_date': end_date,
+            'max_posts_per_newsletter': max_posts_per_newsletter,
+            'only_free': only_free,
+            'content_type': content_type,
+            'include_comments': include_comments,
+            'apify_memory_mbytes': apify_memory_mbytes,
+        }
+        source_configuration.update({k: v for k, v in optional_configuration.items() if v is not None})
+
+        streams_configuration = {
+            'posts': {
+                'syncMode': 'incremental',
+                'destinationSyncMode': 'append',
+            }
+        }
+        return self.connect(workspace_id, customer_name, ind, source_configuration, streams_configuration)
+
+    def disable(self, workspace_id: str, customer_name: str, ind: int) -> \
+            Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
+        return self.disconnect(workspace_id, ind)
+
+
+class YoutubeComments(AnecdoteConnection):
+    def __init__(
+            self, airbyte_client: Client, source_definition_id: str, destination_definition_id: str,
+            s3_bucket_name: str, s3_bucket_region: str, s3_format: Mapping[str, Any],
+            schedule: Optional[Mapping[str, Any]] = None,
+            s3_access_key_id: Optional[str] = None, s3_secret_access_key: Optional[str] = None,
+            s3_endpoint: Optional[str] = None, s3_path_format: Optional[str] = None,
+            s3_file_name_pattern: Optional[str] = None
+    ):
+        super().__init__(
+            airbyte_client, 'Youtube Comments', source_definition_id, destination_definition_id,
+            s3_bucket_name, s3_bucket_region, s3_format,
+            schedule,
+            s3_access_key_id, s3_secret_access_key,
+            s3_endpoint, s3_path_format,
+            s3_file_name_pattern
+        )
+
+    def enable(
+            self, workspace_id: str, customer_name: str, ind: int, start_urls: List[str], apify_token: str,
+            start_date: Optional[str] = None, max_videos_per_channel: Optional[int] = None,
+            max_comments_per_video: Optional[int] = None, include_user_details: Optional[bool] = None,
+            lookback_days: Optional[int] = None
+    ) -> Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
+        if start_date is None:
+            start_date = '2022-01-01'
+
+        source_configuration = {
+            'start_urls': start_urls,
+            'apify_token': apify_token,
+            'start_date': start_date
+        }
+
+        optional_configuration = {
+            'max_videos_per_channel': max_videos_per_channel,
+            'max_comments_per_video': max_comments_per_video,
+            'include_user_details': include_user_details,
+            'lookback_days': lookback_days,
+        }
+        source_configuration.update({k: v for k, v in optional_configuration.items() if v is not None})
+
+        streams_configuration = {
+            'comments': {
+                'syncMode': 'incremental',
+                'destinationSyncMode': 'append',
+            }
+        }
+        return self.connect(workspace_id, customer_name, ind, source_configuration, streams_configuration)
+
+    def disable(self, workspace_id: str, customer_name: str, ind: int) -> \
+            Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
+        return self.disconnect(workspace_id, ind)
+
+
 class Pendo(AnecdoteConnection):
     def __init__(
             self, airbyte_client: Client, source_definition_id: str, destination_definition_id: str,
