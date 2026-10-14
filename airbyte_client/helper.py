@@ -1229,6 +1229,70 @@ class G2Reviews(AnecdoteConnection):
         return self.disconnect(workspace_id, ind)
 
 
+class GenesysAudio(AnecdoteConnection):
+    # Optional source-genesys-audio settings passed through when given; the connector's own
+    # defaults apply otherwise.
+    OPTIONAL_SETTINGS = (
+        'end_date', 'archive_bucket', 'archive_prefix', 'aws_region', 'aws_access_key_id',
+        'aws_secret_access_key', 'prompt_profile', 'transcription_style', 'custom_vocabulary',
+        'transcription_language', 'agent_arabic_names', 'agent_channel', 'min_duration_seconds',
+        'include_conversations_without_audio', 'max_conversations_per_sync', 'concurrency',
+        'requests_per_minute',
+    )
+
+    def __init__(
+            self, airbyte_client: Client, source_definition_id: str, destination_definition_id: str,
+            s3_bucket_name: str, s3_bucket_region: str, s3_format: Mapping[str, Any],
+            schedule: Optional[Mapping[str, Any]] = None,
+            s3_access_key_id: Optional[str] = None, s3_secret_access_key: Optional[str] = None,
+            s3_endpoint: Optional[str] = None, s3_path_format: Optional[str] = None,
+            s3_file_name_pattern: Optional[str] = None
+    ):
+        super().__init__(
+            airbyte_client, 'Genesys Audio', source_definition_id, destination_definition_id,
+            s3_bucket_name, s3_bucket_region, s3_format,
+            schedule,
+            s3_access_key_id, s3_secret_access_key,
+            s3_endpoint, s3_path_format,
+            s3_file_name_pattern
+        )
+
+    def enable(
+            self, workspace_id: str, customer_name: str, ind: int,
+            genesys_region: str, client_id: str, client_secret: str, gemini_api_key: str,
+            start_date: Optional[str] = None, **optional: Any
+    ) -> Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
+        if start_date is None:
+            # Every call is transcribed by Gemini, so a long first window is slow and costly.
+            start_date = (datetime.today() - timedelta(days=7)).strftime('%Y-%m-%d')
+
+        unknown = set(optional) - set(self.OPTIONAL_SETTINGS)
+        if unknown:
+            raise ValueError(f"unknown Genesys Audio settings: {', '.join(sorted(unknown))}")
+
+        source_configuration = {
+            'genesys_region': genesys_region,
+            'client_id': client_id,
+            'client_secret': client_secret,
+            'gemini_api_key': gemini_api_key,
+            'start_date': start_date[:10],
+        }
+        source_configuration.update({k: v for k, v in optional.items() if v is not None})
+
+        streams_configuration = {
+            'voiceconversations': {
+                'syncMode': 'incremental',
+                'destinationSyncMode': 'append',
+            }
+        }
+
+        return self.connect(workspace_id, customer_name, ind, source_configuration, streams_configuration)
+
+    def disable(self, workspace_id: str, customer_name: str, ind: int) -> \
+            Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
+        return self.disconnect(workspace_id, ind)
+
+
 class GoogleMapsReviews(AnecdoteConnection):
     def __init__(
             self, airbyte_client: Client, source_definition_id: str, destination_definition_id: str,
