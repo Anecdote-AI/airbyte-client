@@ -1052,6 +1052,8 @@ class Delighted(AnecdoteConnection):
     ) -> Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
         if start_date is None:
             start_date = '2024-06-01T00:00:00Z'
+        if 'T' not in start_date:
+            start_date += 'T00:00:00Z'
 
         source_configuration = {
             'api_key': delighted_api_key,
@@ -1803,10 +1805,12 @@ class Kustomer(AnecdoteConnection):
     ) -> Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
         if start_date is None:
             start_date = '2022-01-01T00:00:00Z'
+        if 'T' not in start_date:
+            start_date += 'T00:00:00Z'
 
         source_configuration = {
             'api_token': api_token,
-            'start_date': start_date + 'T00:00:00Z',
+            'start_date': start_date,
         }
 
         streams_configuration = {
@@ -2378,6 +2382,8 @@ class SurveyMonkey(AnecdoteConnection):
     ) -> Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
         if start_date is None:
             start_date = '2022-01-01'
+        if 'T' not in start_date:
+            start_date += 'T00:00:00Z'
 
         source_configuration = {
             'credentials': {
