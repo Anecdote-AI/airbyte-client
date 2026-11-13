@@ -1,6 +1,10 @@
+import json as _json
 from typing import Union, List, Mapping, Any, Optional
 
 import requests
+
+# The single organization every OSS Airbyte install has.
+DEFAULT_ORGANIZATION_ID = '00000000-0000-0000-0000-000000000000'
 
 
 class Workspaces:
@@ -224,6 +228,48 @@ class Base:
         self.timeout_before_schema_discovery_ms = timeout_before_schema_discovery_ms
         self.max_retries = max_check_retries
 
+    def _sibling(self, resource: str) -> Client:
+        """A client for another API resource on the same server, e.g. 'workspaces/'."""
+        cli = self.airbyte_client
+        root = cli.prefix.rstrip('/').rsplit('/', 1)[0] + '/'
+        return Client(cli.https, cli.host, cli.port, cli.token, root + resource, cli.timeout_ms)
+
+    def _update_definition(self, data: Mapping[str, Any], workspace_id: Optional[str]) -> requests.Response:
+        """POST <definitions>/update.
+
+        Airbyte 1.8+ requires `workspaceId` (it runs the spec job in that workspace) and answers an instant 500
+        without it. Older servers don't have the field. So: send `workspace_id` when the caller gives one;
+        otherwise send the request unchanged and, only on that 500, retry once with any existing workspace.
+        """
+        data = dict(data)
+        if workspace_id is not None:
+            data['workspaceId'] = workspace_id
+            return self.airbyte_client.base_request('update', data)
+
+        response = self.airbyte_client.base_request('update', data)
+        if response.status_code == 500 and 'workspaceid' in (response.text or '').lower():
+            workspaces = Workspaces(self._sibling('workspaces/')).list()
+            if not workspaces.ok or not workspaces.json().get('workspaces'):
+                return response
+            data['workspaceId'] = workspaces.json()['workspaces'][0]['workspaceId']
+            response = self.airbyte_client.base_request('update', data)
+        return response
+
+
+def _notification_item(webhook_url: Optional[str]) -> Mapping[str, Any]:
+    # Airbyte 1.8+ rejects a Slack item without a URL ("The notification is missing a URL"), so with no
+    # webhook send no notification type: the same outcome as an empty Slack webhook (nothing is sent).
+    if not webhook_url:
+        return {'notificationType': []}
+    return {
+        'notificationType': [
+            'slack'
+        ],
+        'slackConfiguration': {
+            'webhook': webhook_url
+        }
+    }
+
 
 class Workspaces(Base):
     def create(self, name: str,
@@ -239,22 +285,8 @@ class Workspaces(Base):
             'securityUpdates': True,
             'notifications': [],
             'notificationSettings': {
-                'sendOnSuccess': {
-                    'notificationType': [
-                        'slack'
-                    ],
-                    'slackConfiguration': {
-                        'webhook': webhook_url
-                    }
-                },
-                'sendOnFailure': {
-                    'notificationType': [
-                        'slack'
-                    ],
-                    'slackConfiguration': {
-                        'webhook': webhook_url
-                    }
-                },
+                'sendOnSuccess': _notification_item(webhook_url),
+                'sendOnFailure': _notification_item(webhook_url),
                 'sendOnSyncDisabled': {
                     'notificationType': [
                         'customerio'
@@ -286,8 +318,45 @@ class Workspaces(Base):
             'workspaceId': workspace_id
         })
 
-    def list(self) -> requests.Response:
-        return self.airbyte_client.base_request('list')
+    def list(self, organization_id: str = DEFAULT_ORGANIZATION_ID, page_size: int = 500) -> requests.Response:
+        """All workspaces, as `{'workspaces': [...]}` like the old `workspaces/list`.
+
+        `workspaces/list` was removed in Airbyte 1.8. It is still tried first, so servers that have it behave
+        exactly as before; on a 404 the workspaces of `organization_id` are read page by page from
+        `workspaces/list_by_organization_id` (present since 1.6) and merged into one response.
+        """
+        response = self.airbyte_client.base_request('list')
+        if response.status_code != 404:
+            return response
+        return self.list_by_organization_id(organization_id, page_size)
+
+    def list_by_organization_id(self, organization_id: str = DEFAULT_ORGANIZATION_ID,
+                                page_size: int = 500) -> requests.Response:
+        workspaces, seen = [], set()
+        offset = 0
+        while True:
+            response = self.airbyte_client.base_request('list_by_organization_id', {
+                'organizationId': organization_id,
+                'pagination': {'pageSize': page_size, 'rowOffset': offset}
+            })
+            if not response.ok:
+                return response
+            page = response.json().get('workspaces', [])
+            new = [w for w in page if w['workspaceId'] not in seen]
+            seen.update(w['workspaceId'] for w in new)
+            workspaces.extend(new)
+            # Stop on a short page, or if the server ignored the offset and sent nothing new.
+            if len(page) < page_size or not new:
+                break
+            offset += page_size
+        merged = requests.Response()
+        merged.status_code = response.status_code
+        merged.headers = response.headers
+        merged.url = response.url
+        merged.request = response.request
+        merged.encoding = 'utf-8'
+        merged._content = _json.dumps({'workspaces': workspaces}).encode('utf-8')
+        return merged
 
     def get(self, workspace_id: str) -> requests.Response:
         return self.airbyte_client.base_request('get', {
@@ -316,22 +385,8 @@ class Workspaces(Base):
             'securityUpdates': True,
             'notifications': [],
             'notificationSettings': {
-                'sendOnSuccess': {
-                    'notificationType': [
-                        'slack'
-                    ],
-                    'slackConfiguration': {
-                        'webhook': webhook_url
-                    }
-                },
-                'sendOnFailure': {
-                    'notificationType': [
-                        'slack'
-                    ],
-                    'slackConfiguration': {
-                        'webhook': webhook_url
-                    }
-                },
+                'sendOnSuccess': _notification_item(webhook_url),
+                'sendOnFailure': _notification_item(webhook_url),
                 'sendOnSyncDisabled': {
                     'notificationType': [
                         'customerio'
@@ -386,14 +441,15 @@ class SourceDefinitions(Base):
         return self.airbyte_client.base_request('create', data)
 
     def update(self, source_definition_id: str, docker_image_tag: str,
-               resource_requirements: Optional[Mapping[str, Any]] = None) -> requests.Response:
+               resource_requirements: Optional[Mapping[str, Any]] = None,
+               workspace_id: Optional[str] = None) -> requests.Response:
         data = {
             'sourceDefinitionId': source_definition_id,
             'dockerImageTag': docker_image_tag
         }
         if resource_requirements is not None:
             data['resourceRequirements'] = resource_requirements
-        return self.airbyte_client.base_request('update', data)
+        return self._update_definition(data, workspace_id)
 
     def list(self) -> requests.Response:
         return self.airbyte_client.base_request('list')
@@ -446,16 +502,8 @@ class SourceDefinitions(Base):
 
     def update_custom(self, workspace_id: str, source_definition_id: str, docker_image_tag: str,
                       resource_requirements: Optional[Mapping[str, Any]] = None) -> requests.Response:
-        data = {
-            'workspaceId': workspace_id,
-            'sourceDefinition': {
-                'sourceDefinitionId': source_definition_id,
-                'dockerImageTag': docker_image_tag
-            }
-        }
-        if resource_requirements is not None:
-            data['sourceDefinition']['resourceRequirements'] = resource_requirements
-        return self.airbyte_client.base_request('update', data)
+        # `update` takes a flat body (workspaceId next to the definition id), not the nested one this used to send.
+        return self.update(source_definition_id, docker_image_tag, resource_requirements, workspace_id)
 
     def delete_custom(self, workspace_id: str, source_definition_id: str) -> requests.Response:
         return self.airbyte_client.base_request('delete_custom', {
@@ -587,14 +635,15 @@ class DestinationDefinitions(Base):
         return self.airbyte_client.base_request('create', data)
 
     def update(self, destination_definition_id: str, docker_image_tag: str,
-               resource_requirements: Optional[Mapping[str, Any]] = None) -> requests.Response:
+               resource_requirements: Optional[Mapping[str, Any]] = None,
+               workspace_id: Optional[str] = None) -> requests.Response:
         data = {
             'destinationDefinitionId': destination_definition_id,
             'dockerImageTag': docker_image_tag
         }
         if resource_requirements is not None:
             data['resourceRequirements'] = resource_requirements
-        return self.airbyte_client.base_request('update', data)
+        return self._update_definition(data, workspace_id)
 
     def list(self) -> requests.Response:
         return self.airbyte_client.base_request('list')
@@ -647,16 +696,8 @@ class DestinationDefinitions(Base):
 
     def update_custom(self, workspace_id: str, destination_definition_id: str, docker_image_tag: str,
                       resource_requirements: Optional[Mapping[str, Any]] = None) -> requests.Response:
-        data = {
-            'workspaceId': workspace_id,
-            'destinationDefinition': {
-                'destinationDefinitionId': destination_definition_id,
-                'dockerImageTag': docker_image_tag
-            }
-        }
-        if resource_requirements is not None:
-            data['destinationDefinition']['resourceRequirements'] = resource_requirements
-        return self.airbyte_client.base_request('update', data)
+        # `update` takes a flat body (workspaceId next to the definition id), not the nested one this used to send.
+        return self.update(destination_definition_id, docker_image_tag, resource_requirements, workspace_id)
 
     def delete_custom(self, workspace_id: str, destination_definition_id: str) -> requests.Response:
         return self.airbyte_client.base_request('delete_custom', {
