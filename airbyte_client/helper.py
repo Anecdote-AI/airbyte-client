@@ -2774,7 +2774,10 @@ class TwitterMentions(AnecdoteConnection):
     def enable(
             self, workspace_id: str, customer_name: str, ind: int, bearer_token: str, search_query: str,
             start_date: Optional[str] = None,
-            timeout_milliseconds: Optional[int] = None
+            timeout_milliseconds: Optional[int] = None,
+            streamer_api_key: Optional[str] = None,
+            streamer_api_url: Optional[str] = None,
+            search_endpoint: Optional[str] = None
     ) -> Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
         if start_date is None:
             start_date = (datetime.today() - timedelta(days=6)).strftime('%Y-%m-%d')
@@ -2788,6 +2791,11 @@ class TwitterMentions(AnecdoteConnection):
             source_configuration['timeout_milliseconds'] = timeout_milliseconds
         else:
             source_configuration['timeout_milliseconds'] = 3000
+        # Connector 0.0.21+: with streamer_api_key set, each sync rotates across the streamer's token pool
+        # (bearer_token becomes the fallback); search_endpoint "all" is full-archive search. Unset = old behaviour.
+        optional = {'streamer_api_key': streamer_api_key, 'streamer_api_url': streamer_api_url,
+                    'search_endpoint': search_endpoint}
+        source_configuration.update({k: v for k, v in optional.items() if v is not None})
 
         streams_configuration = {
             'tweets': {
