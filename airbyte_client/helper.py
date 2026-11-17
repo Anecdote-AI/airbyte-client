@@ -2312,6 +2312,130 @@ class SendBird(AnecdoteConnection):
         return self.disconnect(workspace_id, ind)
 
 
+class _SprinklrBase(AnecdoteConnection):
+    """Shared by the two Sprinklr sources. Both use the source-sprinklr image; each syncs one stream.
+
+    The connection name sets the S3 partition ('Sprinklr Cases' -> source-name=sprinklr-cases),
+    which is what the pipeline's preprocessor registry keys on.
+    """
+
+    CONNECTION_NAME = ''
+    STREAM = ''
+
+    def __init__(
+            self, airbyte_client: Client, source_definition_id: str, destination_definition_id: str,
+            s3_bucket_name: str, s3_bucket_region: str, s3_format: Mapping[str, Any],
+            schedule: Optional[Mapping[str, Any]] = None,
+            s3_access_key_id: Optional[str] = None, s3_secret_access_key: Optional[str] = None,
+            s3_endpoint: Optional[str] = None, s3_path_format: Optional[str] = None,
+            s3_file_name_pattern: Optional[str] = None
+    ):
+        super().__init__(
+            airbyte_client, self.CONNECTION_NAME, source_definition_id, destination_definition_id,
+            s3_bucket_name, s3_bucket_region, s3_format,
+            schedule,
+            s3_access_key_id, s3_secret_access_key,
+            s3_endpoint, s3_path_format,
+            s3_file_name_pattern
+        )
+
+    @staticmethod
+    def _source_configuration(
+            environment: str, credentials: Mapping[str, Any], client_id: Optional[str],
+            start_date: Optional[str], default_days: int,
+            update_database: Optional[bool], source_id: Optional[int],
+            db_host: Optional[str], db_port: Optional[str], db_name: Optional[str],
+            db_user: Optional[str], db_password: Optional[str],
+            requests_per_hour: Optional[int]
+    ) -> Mapping[str, Any]:
+        if start_date is None:
+            start_date = (datetime.today() - timedelta(days=default_days)).strftime('%Y-%m-%d')
+
+        source_configuration = {
+            'environment': environment,
+            'credentials': credentials,
+            'start_date': start_date,
+        }
+        if client_id is not None and str(client_id) != '':
+            source_configuration['client_id'] = str(client_id)
+        if requests_per_hour is not None:
+            source_configuration['requests_per_hour'] = int(requests_per_hour)
+
+        # The refresh token works once, so the connector writes each new pair straight to
+        # sources.params (same wiring as Zendesk Conversations).
+        if update_database:
+            source_configuration['update_database'] = update_database
+            source_configuration['source_id'] = source_id
+            source_configuration['db_host'] = db_host
+            source_configuration['db_port'] = db_port
+            source_configuration['db_name'] = db_name
+            source_configuration['db_user'] = db_user
+            source_configuration['db_password'] = db_password
+        else:
+            source_configuration['update_database'] = False
+        return source_configuration
+
+    def _streams_configuration(self) -> Mapping[str, Any]:
+        return {
+            self.STREAM: {
+                'syncMode': 'incremental',
+                'destinationSyncMode': 'append',
+            }
+        }
+
+    def disable(self, workspace_id: str, customer_name: str, ind: int) -> \
+            Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
+        return self.disconnect(workspace_id, ind)
+
+
+class SprinklrCases(_SprinklrBase):
+    CONNECTION_NAME = 'Sprinklr Cases'
+    STREAM = 'cases'
+
+    def enable(
+            self, workspace_id: str, customer_name: str, ind: int, environment: str, credentials: Mapping[str, Any],
+            client_id: Optional[str] = None, start_date: Optional[str] = None,
+            include_messages: Optional[bool] = None, requests_per_hour: Optional[int] = None,
+            update_database: Optional[bool] = None, source_id: Optional[int] = None,
+            db_host: Optional[str] = None, db_port: Optional[str] = None,
+            db_name: Optional[str] = None, db_user: Optional[str] = None,
+            db_password: Optional[str] = None
+    ) -> Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
+        source_configuration = dict(self._source_configuration(
+            environment, credentials, client_id, start_date, 6,
+            update_database, source_id, db_host, db_port, db_name, db_user, db_password,
+            requests_per_hour
+        ))
+        if include_messages is not None:
+            source_configuration['include_messages'] = bool(include_messages)
+
+        return self.connect(workspace_id, customer_name, ind, source_configuration, self._streams_configuration())
+
+
+class SprinklrMentions(_SprinklrBase):
+    CONNECTION_NAME = 'Sprinklr Mentions'
+    STREAM = 'mentions'
+
+    def enable(
+            self, workspace_id: str, customer_name: str, ind: int, environment: str, credentials: Mapping[str, Any],
+            client_id: Optional[str] = None, start_date: Optional[str] = None,
+            listening_request: Optional[str] = None, requests_per_hour: Optional[int] = None,
+            update_database: Optional[bool] = None, source_id: Optional[int] = None,
+            db_host: Optional[str] = None, db_port: Optional[str] = None,
+            db_name: Optional[str] = None, db_user: Optional[str] = None,
+            db_password: Optional[str] = None
+    ) -> Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
+        source_configuration = dict(self._source_configuration(
+            environment, credentials, client_id, start_date, 6,
+            update_database, source_id, db_host, db_port, db_name, db_user, db_password,
+            requests_per_hour
+        ))
+        if listening_request:
+            source_configuration['listening_request'] = listening_request
+
+        return self.connect(workspace_id, customer_name, ind, source_configuration, self._streams_configuration())
+
+
 class SteamReviews(AnecdoteConnection):
     def __init__(
             self, airbyte_client: Client, source_definition_id: str, destination_definition_id: str,
