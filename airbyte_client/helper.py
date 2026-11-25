@@ -922,7 +922,8 @@ class AppStoreRSS(AnecdoteConnection):
             self, workspace_id: str, customer_name: str, ind: int, app_name: str, app_id: str,
             countries: Optional[Mapping[str, Any]] = None, start_date: Optional[str] = None,
             timeout_milliseconds: Optional[int] = None,
-            proxy_config: Optional[Mapping[str, Any]] = None, country: Optional[str] = None
+            proxy_config: Optional[Mapping[str, Any]] = None, country: Optional[str] = None,
+            lookback_days: Optional[int] = None, empty_feed_retries: Optional[int] = None
     ) -> Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
         if countries is None:
             countries = {'type': 'all'}
@@ -939,9 +940,11 @@ class AppStoreRSS(AnecdoteConnection):
             source_configuration['country'] = country
         if timeout_milliseconds is not None:
             source_configuration['timeout_milliseconds'] = timeout_milliseconds
-
-        if country is not None:
-            source_configuration['country'] = country
+        # source-app-store-rss 2.0.x: omitted when not given so the spec defaults (7 / 2) apply.
+        if lookback_days is not None:
+            source_configuration['lookback_days'] = lookback_days
+        if empty_feed_retries is not None:
+            source_configuration['empty_feed_retries'] = empty_feed_retries
 
         if not proxy_config:
             streams_configuration = {
@@ -1093,7 +1096,7 @@ class Discord(AnecdoteConnection):
 
     def enable(
             self, workspace_id: str, customer_name: str, ind: int, channels: List[str], token: str,
-            start_date: Optional[str] = None
+            start_date: Optional[str] = None, lookback_days: Optional[int] = None
     ) -> Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
         if start_date is None:
             start_date = '2022-01-01'
@@ -1103,6 +1106,9 @@ class Discord(AnecdoteConnection):
             'token': token,
             'start_date': start_date,
         }
+        # source-discord 2.0.0: re-read window behind the cursor; omitted = the spec default (0, off).
+        if lookback_days is not None:
+            source_configuration['lookback_days'] = lookback_days
 
         streams_configuration = {
             'messages': {
@@ -1240,6 +1246,9 @@ class GenesysAudio(AnecdoteConnection):
         'transcription_language', 'agent_arabic_names', 'agent_channel', 'min_duration_seconds',
         'include_conversations_without_audio', 'max_conversations_per_sync', 'concurrency',
         'requests_per_minute',
+        # source-genesys-audio 2.1.x
+        'transcription_model', 'settle_minutes', 'max_wait_hours', 'transcode_wait_seconds',
+        'skip_unrecorded_conversations', 'bulk_lookups', 'prompt_profile_yaml',
     )
 
     def __init__(
@@ -1374,7 +1383,7 @@ class GooglePlayScraper(AnecdoteConnection):
             self, workspace_id: str, customer_name: str, ind: int, app_id: str,
             languages: Optional[Mapping[str, Any]] = None, start_date: Optional[str] = None, country: str = 'US',
             timeout_milliseconds: Optional[int] = None, max_reviews_per_request: Optional[int] = None,
-            proxy_config: Optional[Mapping[str, Any]] = None
+            proxy_config: Optional[Mapping[str, Any]] = None, lookback_days: Optional[int] = None
     ) -> Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
         if languages is None:
             languages = {'type': 'all'}
@@ -1391,6 +1400,9 @@ class GooglePlayScraper(AnecdoteConnection):
             source_configuration['timeout_milliseconds'] = timeout_milliseconds
         if max_reviews_per_request is not None:
             source_configuration['max_reviews_per_request'] = max_reviews_per_request
+        # source-google-play-scraper 1.0.x: omitted when not given so the spec default (7) applies.
+        if lookback_days is not None:
+            source_configuration['lookback_days'] = lookback_days
 
         if not proxy_config:
             streams_configuration = {
@@ -1577,7 +1589,7 @@ class IntercomThread(AnecdoteConnection):
 
     def enable(
             self, workspace_id: str, customer_name: str, ind: int, access_token: str,
-            start_date: Optional[str] = None
+            start_date: Optional[str] = None, batch_size: Optional[int] = None
     ) -> Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
         if start_date is None:
             start_date = '2022-01-01'
@@ -1586,6 +1598,9 @@ class IntercomThread(AnecdoteConnection):
             'access_token': access_token,
             'start_date': start_date + 'T00:00:00Z',
         }
+        # source-intercom-thread 0.1.x; the spec has no default, so unset stays unset.
+        if batch_size is not None:
+            source_configuration['batch_size'] = batch_size
 
         streams_configuration = {
             'conversation_parts': {
@@ -2375,6 +2390,17 @@ class _SprinklrBase(AnecdoteConnection):
             source_configuration['update_database'] = False
         return source_configuration
 
+    # source-sprinklr 0.3.0 tuning settings, passed through when given (the connector's defaults apply
+    # otherwise). Both streams read these; each subclass adds the ones only its stream reads.
+    SHARED_SETTINGS = ('requests_per_second', 'api_host', 'token_request_style')
+    OPTIONAL_SETTINGS: Tuple[str, ...] = ()
+
+    def _add_optional_settings(self, source_configuration: dict, optional: Mapping[str, Any]) -> None:
+        unknown = set(optional) - set(self.SHARED_SETTINGS) - set(self.OPTIONAL_SETTINGS)
+        if unknown:
+            raise ValueError(f"unknown {self.CONNECTION_NAME} settings: {', '.join(sorted(unknown))}")
+        source_configuration.update({k: v for k, v in optional.items() if v is not None})
+
     def _streams_configuration(self) -> Mapping[str, Any]:
         return {
             self.STREAM: {
@@ -2391,6 +2417,10 @@ class _SprinklrBase(AnecdoteConnection):
 class SprinklrCases(_SprinklrBase):
     CONNECTION_NAME = 'Sprinklr Cases'
     STREAM = 'cases'
+    OPTIONAL_SETTINGS = (
+        'include_names', 'case_time_field', 'lookback_minutes', 'slice_hours', 'page_size',
+        'message_batch_size', 'max_messages_per_case',
+    )
 
     def enable(
             self, workspace_id: str, customer_name: str, ind: int, environment: str, credentials: Mapping[str, Any],
@@ -2399,7 +2429,7 @@ class SprinklrCases(_SprinklrBase):
             update_database: Optional[bool] = None, source_id: Optional[int] = None,
             db_host: Optional[str] = None, db_port: Optional[str] = None,
             db_name: Optional[str] = None, db_user: Optional[str] = None,
-            db_password: Optional[str] = None
+            db_password: Optional[str] = None, **optional: Any
     ) -> Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
         source_configuration = dict(self._source_configuration(
             environment, credentials, client_id, start_date, 6,
@@ -2408,6 +2438,7 @@ class SprinklrCases(_SprinklrBase):
         ))
         if include_messages is not None:
             source_configuration['include_messages'] = bool(include_messages)
+        self._add_optional_settings(source_configuration, optional)
 
         return self.connect(workspace_id, customer_name, ind, source_configuration, self._streams_configuration())
 
@@ -2415,6 +2446,7 @@ class SprinklrCases(_SprinklrBase):
 class SprinklrMentions(_SprinklrBase):
     CONNECTION_NAME = 'Sprinklr Mentions'
     STREAM = 'mentions'
+    OPTIONAL_SETTINGS = ('mention_slice_hours', 'mention_lookback_hours', 'listening_rows')
 
     def enable(
             self, workspace_id: str, customer_name: str, ind: int, environment: str, credentials: Mapping[str, Any],
@@ -2423,7 +2455,7 @@ class SprinklrMentions(_SprinklrBase):
             update_database: Optional[bool] = None, source_id: Optional[int] = None,
             db_host: Optional[str] = None, db_port: Optional[str] = None,
             db_name: Optional[str] = None, db_user: Optional[str] = None,
-            db_password: Optional[str] = None
+            db_password: Optional[str] = None, **optional: Any
     ) -> Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
         source_configuration = dict(self._source_configuration(
             environment, credentials, client_id, start_date, 6,
@@ -2432,6 +2464,7 @@ class SprinklrMentions(_SprinklrBase):
         ))
         if listening_request:
             source_configuration['listening_request'] = listening_request
+        self._add_optional_settings(source_configuration, optional)
 
         return self.connect(workspace_id, customer_name, ind, source_configuration, self._streams_configuration())
 
@@ -2620,7 +2653,7 @@ class Tiktok(AnecdoteConnection):
     def enable(
             self, workspace_id: str, customer_name: str, ind: int,
             apify_token: str, profiles: List[str],
-            start_date: Optional[str] = None
+            start_date: Optional[str] = None, collect_comments: Optional[bool] = None
     ) -> Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
         if start_date is None:
             start_date = (datetime.today() - timedelta(days=6)).strftime('%Y-%m-%d')
@@ -2630,6 +2663,9 @@ class Tiktok(AnecdoteConnection):
             'profiles': profiles,
             'start_date': start_date,
         }
+        # `is not None`: an explicit False (comments off) must reach the connector; unset = spec default (true).
+        if collect_comments is not None:
+            source_configuration['collect_comments'] = collect_comments
 
         streams_configuration = {
             'comments': {
@@ -2848,7 +2884,8 @@ class TrustpilotScraper(AnecdoteConnection):
     def enable(
             self, workspace_id: str, customer_name: str, ind: int, apify_token: str, app_name: str,
             start_date: Optional[str] = None,
-            timeout_milliseconds: Optional[int] = None
+            timeout_milliseconds: Optional[int] = None,
+            reply_lookback_days: Optional[int] = None
     ) -> Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
         if start_date is None:
             start_date = '2022-01-01'
@@ -2862,6 +2899,9 @@ class TrustpilotScraper(AnecdoteConnection):
         }
         if timeout_milliseconds is not None:
             source_configuration['timeout_milliseconds'] = timeout_milliseconds
+        # source-trustpilot-scraper 0.3.0: 0 is meaningful (reply re-check off); unset = spec default (3).
+        if reply_lookback_days is not None:
+            source_configuration['reply_lookback_days'] = reply_lookback_days
 
         streams_configuration = {
             'reviews': {
@@ -2901,7 +2941,9 @@ class TwitterMentions(AnecdoteConnection):
             timeout_milliseconds: Optional[int] = None,
             streamer_api_key: Optional[str] = None,
             streamer_api_url: Optional[str] = None,
-            search_endpoint: Optional[str] = None
+            search_endpoint: Optional[str] = None,
+            max_tweets_per_request: Optional[int] = None,
+            max_lookback_days: Optional[int] = None
     ) -> Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
         if start_date is None:
             start_date = (datetime.today() - timedelta(days=6)).strftime('%Y-%m-%d')
@@ -2918,7 +2960,9 @@ class TwitterMentions(AnecdoteConnection):
         # Connector 0.0.21+: with streamer_api_key set, each sync rotates across the streamer's token pool
         # (bearer_token becomes the fallback); search_endpoint "all" is full-archive search. Unset = old behaviour.
         optional = {'streamer_api_key': streamer_api_key, 'streamer_api_url': streamer_api_url,
-                    'search_endpoint': search_endpoint}
+                    'search_endpoint': search_endpoint,
+                    # 0.0.22: page size, and the full-archive cost cap (spec default 90 days)
+                    'max_tweets_per_request': max_tweets_per_request, 'max_lookback_days': max_lookback_days}
         source_configuration.update({k: v for k, v in optional.items() if v is not None})
 
         streams_configuration = {
@@ -3054,7 +3098,11 @@ class ZendeskConversations(AnecdoteConnection):
             update_database: Optional[bool] = None, source_id: Optional[int] = None,
             db_host: Optional[str] = None, db_port: Optional[str] = None,
             db_name: Optional[str] = None, db_user: Optional[str] = None,
-            db_password: Optional[str] = None
+            db_password: Optional[str] = None,
+            ticket_sync_mode: Optional[str] = None, max_rate_limit_share: Optional[float] = None,
+            fallback_rate_limit_per_minute: Optional[int] = None, comments_concurrency: Optional[int] = None,
+            archived_backfill: Optional[bool] = None, head_refresh_minutes: Optional[int] = None,
+            webhook: Optional[str] = None
     ) -> Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
         if start_date is None:
             start_date = (datetime.today() - timedelta(days=6)).strftime('%Y-%m-%dT%H:%M:%SZ')
@@ -3085,6 +3133,19 @@ class ZendeskConversations(AnecdoteConnection):
             source_configuration['db_name'] = db_name
             source_configuration['db_user'] = db_user
             source_configuration['db_password'] = db_password
+
+        # source-zendesk-conversations 3.0.0 settings; each left out when not given so the spec default
+        # applies (False / 0 are meaningful: archived backfill off, head refresh off).
+        optional = {
+            'ticket_sync_mode': ticket_sync_mode,
+            'max_rate_limit_share': max_rate_limit_share,
+            'fallback_rate_limit_per_minute': fallback_rate_limit_per_minute,
+            'comments_concurrency': comments_concurrency,
+            'archived_backfill': archived_backfill,
+            'head_refresh_minutes': head_refresh_minutes,
+            'webhook': webhook,
+        }
+        source_configuration.update({k: v for k, v in optional.items() if v is not None})
 
         streams_configuration = {
             'conversations': {
