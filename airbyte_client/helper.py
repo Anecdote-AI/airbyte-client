@@ -1447,13 +1447,25 @@ class Gorgias(AnecdoteConnection):
     def enable(
             self, workspace_id: str, customer_name: str, ind: int, api_key: str, subdomain: str,
             start_date: Optional[str] = None,
-            timeout_milliseconds: Optional[int] = None
+            timeout_milliseconds: Optional[int] = None,
+            refresh_token: Optional[str] = None, client_id: Optional[str] = None,
+            client_secret: Optional[str] = None, username: Optional[str] = None
     ) -> Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
         if start_date is None:
             start_date = '2022-01-01'
 
+        # source-gorgias 0.2.0 reads a `credentials` object. `api_key` keeps its name because VoC's Gorgias
+        # sign-in stores the OAuth access token under it. With a username it is a private app's API token.
+        if username:
+            credentials = {'credentials': 'api_token', 'api_token': api_key, 'username': username}
+        else:
+            credentials = {'credentials': 'oauth2.0', 'access_token': api_key}
+            # The connector refreshes the 24-hour access token on every run when it has all three.
+            oauth = {'refresh_token': refresh_token, 'client_id': client_id, 'client_secret': client_secret}
+            credentials.update({k: v for k, v in oauth.items() if v})
+
         source_configuration = {
-            'api_key': api_key,
+            'credentials': credentials,
             'subdomain': subdomain,
             'start_date': start_date,
         }
