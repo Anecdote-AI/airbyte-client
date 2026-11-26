@@ -295,3 +295,86 @@ class DefinitionUpdateTests(Base):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+def airbyte_18_actor_list(items, id_field):
+    """Fake 1.8 `sources/list` / `destinations/list`: cursor paged, 20 per page when no pageSize is sent."""
+    key = 'sources' if id_field == 'sourceId' else 'destinations'
+
+    def handler(body):
+        size = body.get('pageSize', 20)
+        start = 0
+        if body.get('cursor'):
+            start = [x[id_field] for x in items].index(body['cursor']) + 1
+        return resp(200, {key: items[start:start + size], 'numConnections': len(items), 'pageSize': size})
+    return handler
+
+
+def src(i):
+    return {'sourceId': f'src-{i:03d}', 'name': f'source-{i}'}
+
+
+def dst(i):
+    return {'destinationId': f'dst-{i:03d}', 'name': f'destination-{i}'}
+
+
+class ActorListPagingTests(Base):
+    """Airbyte 1.8 caps sources/list and destinations/list at 20 unless pageSize is sent."""
+
+    def test_sources_list_returns_more_than_20(self):
+        items = [src(i) for i in range(45)]
+        server = self.serve({'sources/list': airbyte_18_actor_list(items, 'sourceId')})
+        r = client().sources().list('ws-1')
+        self.assertTrue(r.ok)
+        self.assertEqual(r.json(), {'sources': items})
+        self.assertEqual(server.calls, [('sources/list', {'workspaceId': 'ws-1', 'pageSize': 100})])
+
+    def test_sources_list_follows_the_cursor(self):
+        items = [src(i) for i in range(45)]
+        server = self.serve({'sources/list': airbyte_18_actor_list(items, 'sourceId')})
+        r = client().sources().list('ws-1', page_size=20)
+        self.assertEqual(r.json()['sources'], items)
+        self.assertEqual([b.get('cursor') for _, b in server.calls], [None, 'src-019', 'src-039'])
+
+    def test_exact_multiple_of_page_size_ends_on_the_empty_page(self):
+        items = [src(i) for i in range(40)]
+        server = self.serve({'sources/list': airbyte_18_actor_list(items, 'sourceId')})
+        self.assertEqual(client().sources().list('ws-1', page_size=20).json()['sources'], items)
+        self.assertEqual(len(server.calls), 3)
+
+    def test_server_ignoring_pagination_does_not_loop(self):
+        items = [src(i) for i in range(5)]
+        server = self.serve({'sources/list': lambda b: resp(200, {'sources': items})})
+        self.assertEqual(client().sources().list('ws-1', page_size=5).json(), {'sources': items})
+        self.assertEqual(len(server.calls), 2)
+
+    def test_failed_page_returns_the_failure(self):
+        self.serve({'sources/list': [resp(200, {'sources': [src(1), src(2)]}), resp(500, {'message': 'boom'})]})
+        r = client().sources().list('ws-1', page_size=2)
+        self.assertEqual(r.status_code, 500)
+
+    def test_network_error_is_still_524(self):
+        with mock.patch('requests.request', side_effect=requests.ConnectionError('down')):
+            self.assertEqual(client().sources().list('ws-1').status_code, 524)
+
+    def test_destinations_list_returns_more_than_20(self):
+        items = [dst(i) for i in range(25)]
+        server = self.serve({'destinations/list': airbyte_18_actor_list(items, 'destinationId')})
+        self.assertEqual(client().destinations().list('ws-1').json(), {'destinations': items})
+        self.assertEqual(len(server.calls), 1)
+
+    def test_source_delete_safe_finds_a_source_past_the_first_20(self):
+        """The VoC Remove path: connection_delete_safe_full -> source_delete_safe used to 404 here."""
+        items = [src(i) for i in range(30)]
+        server = self.serve({'sources/list': airbyte_18_actor_list(items, 'sourceId'),
+                             'connections/list': lambda b: resp(200, {'connections': []}),
+                             'sources/delete': lambda b: resp(204, text='')})
+        _, err = AirbyteHelper(client()).source_delete_safe('ws-1', 'src-025')
+        self.assertIsNone(err)
+        self.assertEqual(server.calls[-1], ('sources/delete', {'sourceId': 'src-025'}))
+
+    def test_source_create_safe_sees_a_duplicate_name_past_the_first_20(self):
+        items = [src(i) for i in range(30)]
+        self.serve({'sources/list': airbyte_18_actor_list(items, 'sourceId')})
+        _, err = AirbyteHelper(client()).source_create_safe('ws-1', 'def', 'source-27', {})
+        self.assertEqual(err['error_code'], 409)
