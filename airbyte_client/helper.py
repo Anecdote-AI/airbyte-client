@@ -1304,6 +1304,76 @@ class GenesysAudio(AnecdoteConnection):
         return self.disconnect(workspace_id, ind)
 
 
+class GenesysConversations(AnecdoteConnection):
+    """Genesys Cloud messages and emails (source-genesys-conversations).
+
+    The name 'Genesys' is the S3 partition `source-name=genesys` that anecdote-pipeline's
+    ('genesys', 'conversations') and ('genesys', 'emailconversations') preprocessors read.
+    Calls come from GenesysAudio, so include_voice_calls defaults to False here: the connector
+    can't read call audio, and every call it keeps costs requests and lands as an empty record.
+    """
+    OPTIONAL_SETTINGS = ('batch_size', 'concurrency')
+
+    def __init__(
+            self, airbyte_client: Client, source_definition_id: str, destination_definition_id: str,
+            s3_bucket_name: str, s3_bucket_region: str, s3_format: Mapping[str, Any],
+            schedule: Optional[Mapping[str, Any]] = None,
+            s3_access_key_id: Optional[str] = None, s3_secret_access_key: Optional[str] = None,
+            s3_endpoint: Optional[str] = None, s3_path_format: Optional[str] = None,
+            s3_file_name_pattern: Optional[str] = None
+    ):
+        super().__init__(
+            airbyte_client, 'Genesys', source_definition_id, destination_definition_id,
+            s3_bucket_name, s3_bucket_region, s3_format,
+            schedule,
+            s3_access_key_id, s3_secret_access_key,
+            s3_endpoint, s3_path_format,
+            s3_file_name_pattern
+        )
+
+    def enable(
+            self, workspace_id: str, customer_name: str, ind: int,
+            genesys_region: str, client_id: str, client_secret: str,
+            start_date: Optional[str] = None, include_voice_calls: bool = False, **optional: Any
+    ) -> Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
+        if start_date is None:
+            start_date = (datetime.today() - timedelta(days=30)).strftime('%Y-%m-%d')
+
+        unknown = set(optional) - set(self.OPTIONAL_SETTINGS)
+        if unknown:
+            raise ValueError(f"unknown Genesys settings: {', '.join(sorted(unknown))}")
+
+        # The connector takes the region's two hosts rather than the region itself.
+        region = genesys_region.strip().lower()
+        source_configuration = {
+            'region': region,
+            'base_url': f'https://api.{region}',
+            'auth_url': f'https://login.{region}/oauth/token',
+            'client_id': client_id,
+            'client_secret': client_secret,
+            'start_date': start_date[:10],
+            'include_voice_calls': bool(include_voice_calls),
+        }
+        source_configuration.update({k: v for k, v in optional.items() if v is not None})
+
+        streams_configuration = {
+            'conversations': {
+                'syncMode': 'incremental',
+                'destinationSyncMode': 'append',
+            },
+            'emailconversations': {
+                'syncMode': 'incremental',
+                'destinationSyncMode': 'append',
+            },
+        }
+
+        return self.connect(workspace_id, customer_name, ind, source_configuration, streams_configuration)
+
+    def disable(self, workspace_id: str, customer_name: str, ind: int) -> \
+            Tuple[Optional[requests.Response], Optional[Mapping[str, Any]]]:
+        return self.disconnect(workspace_id, ind)
+
+
 class GoogleMapsReviews(AnecdoteConnection):
     def __init__(
             self, airbyte_client: Client, source_definition_id: str, destination_definition_id: str,
