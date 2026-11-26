@@ -7,6 +7,43 @@ import requests
 DEFAULT_ORGANIZATION_ID = '00000000-0000-0000-0000-000000000000'
 
 
+def _json_response(template: requests.Response, payload: Mapping[str, Any]) -> requests.Response:
+    """A copy of `template` (status, headers, url, request) whose body is `payload`."""
+    merged = requests.Response()
+    merged.status_code = template.status_code
+    merged.headers = template.headers
+    merged.url = template.url
+    merged.request = template.request
+    merged.encoding = 'utf-8'
+    merged._content = _json.dumps(payload).encode('utf-8')
+    return merged
+
+
+def _list_all_in_workspace(cli: 'Client', workspace_id: str, key: str, id_field: str,
+                           page_size: int) -> requests.Response:
+    """Every source/destination of a workspace, as `{key: [...]}` like the unpaged `<resource>/list` of Airbyte <= 1.6.
+
+    Since Airbyte 1.8, `sources/list` and `destinations/list` are cursor paged and return only the first 20 when no
+    `pageSize` is sent. Pages are read with `pageSize` + `cursor` (the id of the last item of the previous page) and
+    merged. Servers that ignore both answer everything on the first call, which ends the loop.
+    """
+    items, seen = [], set()
+    body = {'workspaceId': workspace_id, 'pageSize': page_size}
+    while True:
+        response = cli.base_request('list', body)
+        if not response.ok:
+            return response
+        page = response.json().get(key, [])
+        new = [x for x in page if x[id_field] not in seen]
+        seen.update(x[id_field] for x in new)
+        items.extend(new)
+        # Stop on a short page, or if the server ignored the cursor and sent nothing new.
+        if len(page) < page_size or not new:
+            break
+        body = {'workspaceId': workspace_id, 'pageSize': page_size, 'cursor': page[-1][id_field]}
+    return _json_response(response, {key: items})
+
+
 class Workspaces:
     pass
 
@@ -349,14 +386,7 @@ class Workspaces(Base):
             if len(page) < page_size or not new:
                 break
             offset += page_size
-        merged = requests.Response()
-        merged.status_code = response.status_code
-        merged.headers = response.headers
-        merged.url = response.url
-        merged.request = response.request
-        merged.encoding = 'utf-8'
-        merged._content = _json.dumps({'workspaces': workspaces}).encode('utf-8')
-        return merged
+        return _json_response(response, {'workspaces': workspaces})
 
     def get(self, workspace_id: str) -> requests.Response:
         return self.airbyte_client.base_request('get', {
@@ -550,10 +580,8 @@ class Sources(Base):
             'connectionConfiguration': connection_configuration
         })
 
-    def list(self, workspace_id: str) -> requests.Response:
-        return self.airbyte_client.base_request('list', {
-            'workspaceId': workspace_id
-        })
+    def list(self, workspace_id: str, page_size: int = 100) -> requests.Response:
+        return _list_all_in_workspace(self.airbyte_client, workspace_id, 'sources', 'sourceId', page_size)
 
     def get(self, source_id: str) -> requests.Response:
         return self.airbyte_client.base_request('get', {
@@ -744,10 +772,8 @@ class Destinations(Base):
             'connectionConfiguration': connection_configuration
         })
 
-    def list(self, workspace_id: str) -> requests.Response:
-        return self.airbyte_client.base_request('list', {
-            'workspaceId': workspace_id
-        })
+    def list(self, workspace_id: str, page_size: int = 100) -> requests.Response:
+        return _list_all_in_workspace(self.airbyte_client, workspace_id, 'destinations', 'destinationId', page_size)
 
     def get(self, destination_id: str) -> requests.Response:
         return self.airbyte_client.base_request('get', {
